@@ -23,8 +23,8 @@ it expects its members to follow. In particular:
 * Be **open and welcoming**. It is important that we grow and
   encourage the community of users and developers for our project.
 
-* Be **collaborative**. Working together on the open lists to make
-  decisions helps the project grow.
+* Be **collaborative**. Working together on the open mailing lists and 
+  bug database to make decisions helps the project grow.
 
 * Be **respectful** of others. Everyone is volunteering their time and
   efforts to work on this project. Please be respectful of everyone
@@ -71,9 +71,12 @@ discussion.
 
 Committer access is by invitation only and must be approved by
 consensus approval of the active Project Management Committee (PMC)
-members. A committer is
-considered emeritus by their own declaration or by not contributing in
-any form to the project for over six months. An emeritus committer may
+members.
+
+If a committer wishes to leave the project or does not contribute to
+the project in any form for six months, the PMC may make them emeritus.
+Emeritus committers lose their ability to commit code or cast binding
+votes. An emeritus committer may
 request reinstatement of commit access from the PMC. Such
 reinstatement is subject to consensus approval of active PMC members.
 
@@ -120,7 +123,9 @@ codebase. The responsibilities of the PMC include
   * Maintaining these bylaws and other guidelines of the project
 
 Membership of the PMC is by invitation only and must be approved by a
-consensus approval of active PMC members. A PMC member is considered
+consensus approval of active PMC members.
+
+A PMC member is considered
 emeritus by their own declaration or by not contributing in any form
 to the project for over six months. An emeritus member may request
 reinstatement to the PMC. Such reinstatement is subject to consensus
@@ -164,6 +169,8 @@ mail. Voting may take four flavors:
   consideration to go ahead. The voter, however will not be able to
   help.
 
+* **0** -- The voter is neutral on the topic under discussion.
+
 * **-0** -- This vote indicates that the voter does not, in general, agree
    with the proposed action but is not concerned enough to prevent the
    action going ahead.
@@ -175,10 +182,10 @@ mail. Voting may take four flavors:
    alternative course of action.
 
 All participants in the ORC project are encouraged to show their
-agreement with or against a particular action by voting. For technical
-decisions, only the votes of active committers are binding. Nonbinding
-votes are still useful for those with binding votes to
-understand the perception of an action in the wider ORC community.
+agreement for or against a particular action by voting, regardless of
+whether their vote is binding. Nonbinding votes are useful for
+encouraging discussion and understanding the scope of opinions within
+the project.
 
 ### Approvals
 
@@ -206,7 +213,7 @@ anyone who has a binding vote. This does not necessarily signify
 agreement with the veto - merely that the veto is valid.  If you
 disagree with a valid veto, you must lobby the person casting the veto
 to withdraw their veto. If a veto is not withdrawn, any action that
-has been vetoed must be reversed in a timely manner.
+has already been taken  must be reversed in a timely manner.
 
 ### Actions
 
@@ -266,6 +273,8 @@ Modifying this document requires a *lazy majority* of active PMC members.
 
 ### Voting Timeframes
 
-Votes are open for a period of 72 hours to allow all active voters time
-to consider the vote. Votes relating to code changes are not subject
-to a strict timetable but should be made as timely as possible.
+Votes are open for a minimum period of 72 hours to allow all active
+voters time to consider the vote. For holiday weekends or conferences,
+consider using a longer vote window. Votes relating to code changes are
+not subject to a strict timetable but should be made as timely as
+possible.

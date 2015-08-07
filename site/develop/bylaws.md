@@ -159,14 +159,14 @@ necessary, PMC voting may take place on the private ORC PMC mailing
 list. Votes are clearly indicated by subject line starting with
 [VOTE]. Votes may contain multiple items for approval and these should
 be clearly separated. Voting is carried out by replying to the vote
-mail. Voting may take four flavors:
+mail. Voting may take five flavors:
 
 * **+1** -- "Yes," "Agree," or "the action should be performed." In general,
   this vote also indicates a willingness on the behalf of the voter in
   "making it happen."
 
 * **+0** -- This vote indicates a willingness for the action under
-  consideration to go ahead. The voter, however will not be able to
+  consideration to go ahead. The voter, however, will not be able to
   help.
 
 * **0** -- The voter is neutral on the topic under discussion.

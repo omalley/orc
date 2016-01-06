@@ -80,7 +80,7 @@ namespace orc {
     }
   }
 
-  uint64_t TypeImpl::getColumnId() const {
+  void TypeImpl::ensureIdAssigned() const {
     if (columnId == -1) {
       const TypeImpl* root = this;
       while (root->parent != nullptr) {
@@ -88,17 +88,15 @@ namespace orc {
       }
       root->assignIds(0);
     }
+  }
+
+  uint64_t TypeImpl::getColumnId() const {
+    ensureIdAssigned();
     return static_cast<uint64_t>(columnId);
   }
 
   uint64_t TypeImpl::getMaximumColumnId() const {
-    if (columnId == -1) {
-      const TypeImpl* root = this;
-      while (root->parent != nullptr) {
-        root = root->parent;
-      }
-      root->assignIds(0);
-    }
+    ensureIdAssigned();
     return static_cast<uint64_t>(maximumColumnId);
   }
 

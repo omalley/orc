@@ -25,6 +25,18 @@
 
 namespace orc {
 
+  uint64_t checkIds(const Type* type, uint64_t next) {
+    EXPECT_EQ(next, type->getColumnId())
+      << "Wrong id for " << type->toString();
+    next += 1;
+    for(uint64_t child = 0; child < type->getSubtypeCount(); ++child) {
+      next = checkIds(type->getSubtype(child), next) + 1;
+    }
+    EXPECT_EQ(next - 1, type->getMaximumColumnId())
+      << "Wrong maximum id for " << type->toString();
+    return type->getMaximumColumnId();
+  }
+
   TEST(TestType, simple) {
     std::unique_ptr<Type> myType = createStructType();
     myType->addStructField("myInt", createPrimitiveType(INT));
@@ -40,6 +52,7 @@ namespace orc {
     EXPECT_EQ("struct<myInt:int,myString:string,myFloat:float,"
               "list:array<bigint>,bool:boolean>",
               myType->toString());
+    checkIds(myType.get(), 0);
 
     const Type* child = myType->getSubtype(0);
     EXPECT_EQ(1, child->getColumnId());
@@ -107,6 +120,8 @@ namespace orc {
     EXPECT_EQ(6, intType->getMaximumColumnId());
     EXPECT_EQ("int", intType->toString());
 
+    checkIds(myType.get(), 0);
+
     EXPECT_EQ(5, structType->getColumnId());
     EXPECT_EQ(6, structType->getMaximumColumnId());
     EXPECT_EQ("struct<col0:int>", structType->toString());
@@ -149,6 +164,7 @@ namespace orc {
     myType->addStructField("col6", createPrimitiveType(LONG));
     myType->addStructField("col7", createDecimalType(10, 2));
 
+    checkIds(myType.get(), 0);
     EXPECT_EQ("struct<col0:tinyint,col1:smallint,col2:array<string>,"
               "col3:map<float,double>,col4:uniontype<char(100),varchar(200)>,"
               "col5:int,col6:bigint,col7:decimal(10,2)>", myType->toString());

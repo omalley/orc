@@ -412,17 +412,19 @@ namespace orc {
     virtual ~ReaderOptions();
 
     /**
-     * For files that have structs as the top-level object, pick the fields
+     * For files that have structs as the top-level object, select the fields
      * to read. The first field is 0, the second 1, and so on. By default,
-     * all columns are read.
+     * all columns are read. This option clears any previous setting of
+     * the selected columns.
      * @param include a list of fields to read
      * @return this
      */
     ReaderOptions& include(const std::list<uint64_t>& include);
 
     /**
-     * For files that have structs as the top-level object, pick the fields
-     * to read by name. By default, all columns are read.
+     * For files that have structs as the top-level object, select the fields
+     * to read by name. By default, all columns are read. This option clears
+     * any previous setting of the selected columns.
      * @param include a list of fields to read
      * @return this
      */

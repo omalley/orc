@@ -99,7 +99,17 @@ namespace orc {
     void addChildType(std::unique_ptr<Type> childType);
 
   private:
-    uint64_t assignIds(uint64_t root) const;
+    /**
+     * Assign ids to this node and its children giving this
+     * node rootId.
+     * @param rootId the column id that should be assigned to this node.
+     */
+    uint64_t assignIds(uint64_t rootId) const;
+
+    /**
+     * Ensure that ids are assigned to all of the nodes.
+     */
+    void ensureIdAssigned() const;
   };
 
   std::unique_ptr<Type> convertType(const proto::Type& type,

@@ -21,6 +21,7 @@ FROM debian:8
 MAINTAINER Owen O'Malley <owen@hortonworks.com>
 
 RUN apt-get update
+RUN apt-get upgrade
 RUN apt-get install -y \
   cmake \
   gcc \

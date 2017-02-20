@@ -18,10 +18,10 @@
 
 package org.apache.orc;
 
-import org.apache.hadoop.hive.ql.exec.vector.Decimal64ColumnVector;
+import org.apache.orc.impl.HadoopShims;
+import org.apache.orc.impl.InStream;
 import org.apache.orc.impl.OrcCodecPool;
 
-import org.apache.orc.impl.PhysicalFsWriter;
 import org.apache.orc.impl.WriterImpl;
 
 import org.apache.orc.OrcFile.WriterOptions;
@@ -29,12 +29,15 @@ import org.apache.orc.OrcFile.WriterOptions;
 import com.google.common.collect.Lists;
 
 import org.apache.orc.impl.ReaderImpl;
+import org.apache.orc.impl.reader.ReaderEncryption;
+import org.apache.orc.impl.reader.StripePlanner;
 import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.Decimal64ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
@@ -64,12 +67,14 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
+import javax.crypto.Cipher;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -549,9 +554,8 @@ public class TestVectorOrcFile {
 
   @Test
   public void testStripeLevelStats() throws Exception {
-    TypeDescription schema = TypeDescription.createStruct()
-        .addField("int1", TypeDescription.createInt())
-        .addField("string1", TypeDescription.createString());
+    TypeDescription schema =
+        TypeDescription.fromString("struct<int1:int,string1:string>");
     Writer writer = OrcFile.createWriter(testFilePath,
         OrcFile.writerOptions(conf)
             .setSchema(schema)
@@ -956,19 +960,13 @@ public class TestVectorOrcFile {
   }
 
   private static TypeDescription createInnerSchema() {
-    return TypeDescription.createStruct()
-        .addField("int1", TypeDescription.createInt())
-        .addField("string1", TypeDescription.createString());
+    return TypeDescription.fromString("struct<int1:int,string1:string>");
   }
 
   private static TypeDescription createComplexInnerSchema()
   {
-    return TypeDescription.createStruct()
-            .addField("int1", TypeDescription.createInt())
-            .addField("complex",
-                      TypeDescription.createStruct()
-                              .addField("int2", TypeDescription.createInt())
-                              .addField("String1",TypeDescription.createString()));
+    return TypeDescription.fromString("struct<int1:int,"
+        + "complex:struct<int2:int,String1:string>>");
   }
 
   private static TypeDescription createBigRowSchema() {
@@ -1680,14 +1678,9 @@ public class TestVectorOrcFile {
      */
   @Test
   public void testUnionAndTimestamp() throws Exception {
-    TypeDescription schema = TypeDescription.createStruct()
-        .addField("time", TypeDescription.createTimestamp())
-        .addField("union", TypeDescription.createUnion()
-            .addUnionChild(TypeDescription.createInt())
-            .addUnionChild(TypeDescription.createString()))
-        .addField("decimal", TypeDescription.createDecimal()
-            .withPrecision(38)
-            .withScale(18));
+    TypeDescription schema = TypeDescription.fromString(
+        "struct<time:timestamp,union:uniontype<int,string>," +
+           "decimal:decimal(38,18)>");
     HiveDecimal maxValue = HiveDecimal.create("10000000000000000000");
     Writer writer = OrcFile.createWriter(testFilePath,
                                          OrcFile.writerOptions(conf)
@@ -2098,10 +2091,8 @@ public class TestVectorOrcFile {
                                                    VectorizedRowBatch batch
                                                    ) throws IOException {
     fs.delete(testFilePath, false);
-    PhysicalWriter physical = new PhysicalFsWriter(fs, testFilePath, opts);
-    CompressionCodec codec = physical.getStreamOptions().getCodec();
-    Writer writer = OrcFile.createWriter(testFilePath,
-        opts.physicalWriter(physical));
+    Writer writer = OrcFile.createWriter(testFilePath, opts);
+    CompressionCodec codec = ((WriterImpl) writer).getCompressionCodec();
     writeRandomIntBytesBatches(writer, batch, count, size);
     writer.close();
     return codec;
@@ -2203,7 +2194,8 @@ public class TestVectorOrcFile {
                                          .setSchema(schema)
                                          .stripeSize(200000)
                                          .bufferSize(65536)
-                                         .rowIndexStride(1000));
+                                         .rowIndexStride(1000)
+                                         .version(fileFormat));
     VectorizedRowBatch batch = schema.createRowBatch();
     Random rand = new Random(42);
     final int COUNT=32768;
@@ -2244,18 +2236,24 @@ public class TestVectorOrcFile {
     Assert.assertEquals(COUNT, reader.getNumberOfRows());
     RecordReader rows = reader.rows();
     // get the row index
+    InStream.StreamOptions options = InStream.options();
+    if (reader.getCompressionKind() != CompressionKind.NONE) {
+      options.withCodec(OrcCodecPool.getCodec(reader.getCompressionKind()))
+          .withBufferSize(reader.getCompressionSize());
+    }
     DataReader meta = RecordReaderUtils.createDefaultDataReader(
         DataReaderProperties.builder()
-            .withBufferSize(reader.getCompressionSize())
             .withFileSystem(fs)
             .withPath(testFilePath)
-            .withCompression(reader.getCompressionKind())
-            .withTypeCount(reader.getSchema().getMaximumId() + 1)
+            .withCompression(options)
             .withZeroCopy(false)
             .build());
-    OrcIndex index =
-        meta.readRowIndex(reader.getStripes().get(0), null, null, false, null, null,
-            null, OrcFile.WriterVersion.ORC_101, null, null);
+    StripePlanner planner = new StripePlanner(schema, new ReaderEncryption(),
+        options, meta, reader.getWriterVersion(), true, Integer.MAX_VALUE);
+    boolean[] columns = new boolean[schema.getMaximumId() + 1];
+    Arrays.fill(columns, true);
+    OrcIndex index = planner.parseStripe(reader.getStripes().get(0), columns)
+                         .readRowIndex(null, null);
     // check the primitive columns to make sure they have the right number of
     // items in the first row group
     for(int c=1; c < 9; ++c) {
@@ -2293,7 +2291,7 @@ public class TestVectorOrcFile {
         offsetOfStripe4 = stripe.getOffset();
       }
     }
-    boolean[] columns = new boolean[reader.getStatistics().length];
+    Arrays.fill(columns, false);
     columns[5] = true; // long colulmn
     columns[9] = true; // text column
     rows = reader.rows(reader.options()
@@ -3580,7 +3578,8 @@ public class TestVectorOrcFile {
                     .stripeSize(400000L)
                     .compress(CompressionKind.NONE)
                     .bufferSize(500)
-                    .rowIndexStride(1000));
+                    .rowIndexStride(1000)
+                    .version(fileFormat));
     VectorizedRowBatch batch = schema.createRowBatch();
     batch.ensureSize(3500);
     batch.size = 3500;
@@ -3675,4 +3674,145 @@ public class TestVectorOrcFile {
     Assert.assertEquals(3500, rows.getRowNumber());
   }
 
+  public static final boolean TEST_AES_256;
+  static {
+    try {
+      TEST_AES_256 = Cipher.getMaxAllowedKeyLength("AES") != 128;
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalArgumentException("Unknown algorithm", e);
+    }
+  }
+
+  public static class KeyWithMaterial extends HadoopShims.KeyMetadata {
+    private final byte[] material;
+
+    KeyWithMaterial(String key,
+                    int version,
+                    EncryptionAlgorithm algorithm,
+                    byte[] material) {
+      super(key, version, algorithm);
+      this.material = material;
+    }
+
+    public byte[] getMaterial() {
+      return material;
+    }
+  }
+
+  @Test
+  public void testColumnEncryption() throws Exception {
+    Assume.assumeTrue(fileFormat != OrcFile.Version.V_0_11);
+    final int ROWS = 10;
+    final int SEED = 2;
+    final Random random = new Random(SEED);
+
+    TypeDescription schema =
+        TypeDescription.fromString("struct<i:int,x:array<string>>");
+
+    byte[] piiKey = new byte[16];
+    random.nextBytes(piiKey);
+    byte[] creditKey = new byte[32];
+    random.nextBytes(creditKey);
+    InMemoryKeystore keys = new InMemoryKeystore()
+        .addKey("pii", EncryptionAlgorithm.AES_CTR_128, piiKey)
+        .addKey("credit", EncryptionAlgorithm.AES_CTR_256, creditKey);
+
+    Writer writer = OrcFile.createWriter(testFilePath,
+        OrcFile.writerOptions(conf)
+            .setSchema(schema)
+            .version(fileFormat)
+            .setKeyProvider(keys)
+            .encryptColumn("i", "pii")
+            .encryptColumn("x", "credit"));
+    VectorizedRowBatch batch = schema.createRowBatch();
+    batch.size = ROWS;
+    LongColumnVector i = (LongColumnVector) batch.cols[0];
+    ListColumnVector x = (ListColumnVector) batch.cols[1];
+    BytesColumnVector xElem = (BytesColumnVector) x.child;
+    for(int r=0; r < ROWS; ++r) {
+      i.vector[r] = r * 3;
+      int start = x.childCount;
+      x.offsets[r] = start;
+      x.lengths[r] = 3;
+      x.childCount += x.lengths[r];
+      for(int child=0; child < x.lengths[r]; ++child) {
+        xElem.setVal(start + child,
+            String.format("%d.%d", r, child).getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    writer.addRowBatch(batch);
+    writer.close();
+
+    // Read without any keys
+    Reader reader = OrcFile.createReader(testFilePath,
+        OrcFile.readerOptions(conf)
+               .setKeyProvider(new InMemoryKeystore()));
+    ColumnStatistics[] stats = reader.getStatistics();
+    for(int c=0; c < stats.length; ++c) {
+      ColumnStatistics stat = stats[c];
+      assertEquals("column " + c, c == 0 ? ROWS : 0, stat.getNumberOfValues());
+      assertEquals("column " + c, c == 1 || c == 2, stat.hasNull());
+    }
+
+    RecordReader rows = reader.rows();
+    batch = reader.getSchema().createRowBatch();
+    i = (LongColumnVector) batch.cols[0];
+    x = (ListColumnVector) batch.cols[1];
+
+    // ensure that we get the right number of rows with all nulls
+    assertTrue(rows.nextBatch(batch));
+    assertEquals(ROWS, batch.size);
+    assertEquals(true, i.isRepeating);
+    assertEquals(false, i.noNulls);
+    assertEquals(true, i.isNull[0]);
+    assertEquals(true, x.isRepeating);
+    assertEquals(false, x.noNulls);
+    assertEquals(true, x.isNull[0]);
+    assertFalse(rows.nextBatch(batch));
+    rows.close();
+
+    // Add a new version of the pii key
+    random.nextBytes(piiKey);
+    keys.addKey("pii", 1, EncryptionAlgorithm.AES_CTR_128, piiKey);
+
+    // Read with the keys
+    reader = OrcFile.createReader(testFilePath,
+        OrcFile.readerOptions(conf)
+               .setKeyProvider(keys));
+    stats = reader.getStatistics();
+    assertEquals(ROWS, stats[0].getNumberOfValues());
+    assertEquals(ROWS, stats[1].getNumberOfValues());
+    assertEquals(0, ((IntegerColumnStatistics) stats[1]).getMinimum());
+    assertEquals(3 * (ROWS - 1), ((IntegerColumnStatistics) stats[1]).getMaximum());
+    assertEquals(ROWS, stats[2].getNumberOfValues());
+    assertEquals(3 * ROWS, stats[3].getNumberOfValues());
+    assertEquals("0.0", ((StringColumnStatistics)stats[3]).getMinimum());
+    assertEquals("9.2", ((StringColumnStatistics)stats[3]).getMaximum());
+    /*
+    rows = reader.rows();
+    batch = reader.getSchema().createRowBatch();
+    i = (LongColumnVector) batch.cols[0];
+    x = (ListColumnVector) batch.cols[1];
+    xElem = (BytesColumnVector) x.child;
+    assertTrue(rows.nextBatch(batch));
+    assertEquals(ROWS, batch.size);
+    assertEquals(false, i.isRepeating);
+    assertEquals(false, x.isRepeating);
+    assertEquals(false, xElem.isRepeating);
+    assertEquals(true, i.noNulls);
+    assertEquals(true, x.noNulls);
+    assertEquals(true, xElem.noNulls);
+    for(int r=0; r < ROWS; ++r) {
+      assertEquals("row " + r, r * 3, i.vector[r]);
+      assertEquals("row " + r, r * 3, x.offsets[r]);
+      assertEquals("row " + r, 3, x.lengths[r]);
+      for(int child=0; child < x.lengths[r]; ++child) {
+        assertEquals("row " + r + "." + child, String.format("%d.%d", r, child),
+            xElem.toString((int) x.offsets[r] + child));
+      }
+    }
+    assertFalse(rows.nextBatch(batch));
+    rows.close();
+    */
+  }
 }

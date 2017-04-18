@@ -23,9 +23,20 @@
 #include "orc/OrcFile.hh"
 #include "orc/Reader.hh"
 
+#include "Timezone.hh"
 #include "TypeImpl.hh"
 
 namespace orc {
+
+/**
+ * StatContext contains fields required to compute statistics
+ */
+
+  struct StatContext {
+    bool correctStats;
+    const Timezone* writerTimezone;
+    StatContext() : correctStats(false), writerTimezone(NULL) {}
+  };
 
 /**
  * ColumnStatistics Implementation
@@ -58,7 +69,7 @@ namespace orc {
 
   public:
     BinaryColumnStatisticsImpl(const proto::ColumnStatistics& stats,
-                               bool correctStats);
+                               const StatContext& statContext);
     virtual ~BinaryColumnStatisticsImpl();
 
     bool hasTotalLength() const override {
@@ -96,7 +107,7 @@ namespace orc {
     uint64_t trueCount;
 
   public:
-    BooleanColumnStatisticsImpl(const proto::ColumnStatistics& stats, bool correctStats);
+    BooleanColumnStatisticsImpl(const proto::ColumnStatistics& stats, const StatContext& statContext);
     virtual ~BooleanColumnStatisticsImpl();
 
     bool hasCount() const override {
@@ -147,7 +158,7 @@ namespace orc {
     int32_t maximum;
 
   public:
-    DateColumnStatisticsImpl(const proto::ColumnStatistics& stats, bool correctStats);
+    DateColumnStatisticsImpl(const proto::ColumnStatistics& stats, const StatContext& statContext);
     virtual ~DateColumnStatisticsImpl();
 
     bool hasMinimum() const override {
@@ -208,7 +219,7 @@ namespace orc {
     std::string sum;
 
   public:
-    DecimalColumnStatisticsImpl(const proto::ColumnStatistics& stats, bool correctStats);
+    DecimalColumnStatisticsImpl(const proto::ColumnStatistics& stats, const StatContext& statContext);
     virtual ~DecimalColumnStatisticsImpl();
 
     bool hasMinimum() const override {
@@ -446,7 +457,7 @@ namespace orc {
     uint64_t totalLength;
 
   public:
-    StringColumnStatisticsImpl(const proto::ColumnStatistics& stats, bool correctStats);
+    StringColumnStatisticsImpl(const proto::ColumnStatistics& stats, const StatContext& statContext);
     virtual ~StringColumnStatisticsImpl();
 
     bool hasMinimum() const override {
@@ -524,7 +535,7 @@ namespace orc {
 
   public:
     TimestampColumnStatisticsImpl(const proto::ColumnStatistics& stats,
-                                  bool correctStats);
+                                  const StatContext& statContext);
     virtual ~TimestampColumnStatisticsImpl();
 
     bool hasMinimum() const override {
@@ -557,16 +568,26 @@ namespace orc {
 
     std::string toString() const override {
       std::ostringstream buffer;
+      struct tm tmValue;
+      char timeBuffer[20];
+      time_t secs = 0;
+
       buffer << "Data type: Timestamp" << std::endl
           << "Values: " << valueCount << std::endl;
       if(_hasMinimum){
-        buffer << "Minimum: " << minimum << std::endl;
+        secs = static_cast<time_t>(minimum/1000);
+        gmtime_r(&secs, &tmValue);
+        strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &tmValue);
+        buffer << "Minimum: " << timeBuffer << std::endl;
       }else{
         buffer << "Minimum is not defined" << std::endl;
       }
 
       if(_hasMaximum){
-        buffer << "Maximum: " << maximum << std::endl;
+        secs = static_cast<time_t>(maximum/1000);
+        gmtime_r(&secs, &tmValue);
+        strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &tmValue);
+        buffer << "Maximum: " << timeBuffer << std::endl;
       }else{
         buffer << "Maximum is not defined" << std::endl;
       }
@@ -576,7 +597,7 @@ namespace orc {
 
 
   ColumnStatistics* convertColumnStatistics(const proto::ColumnStatistics& s,
-                                            bool correctStats);
+                                            const StatContext& statContext);
 
   class StatisticsImpl: public Statistics {
   private:
@@ -587,9 +608,9 @@ namespace orc {
     StatisticsImpl& operator=(const StatisticsImpl&);
 
   public:
-    StatisticsImpl(const proto::StripeStatistics& stripeStats, bool correctStats);
+    StatisticsImpl(const proto::StripeStatistics& stripeStats, const StatContext& statContext);
 
-    StatisticsImpl(const proto::Footer& footer, bool correctStats);
+    StatisticsImpl(const proto::Footer& footer, const StatContext& statContext);
 
     virtual const ColumnStatistics* getColumnStatistics(uint32_t columnId
                                                         ) const override {

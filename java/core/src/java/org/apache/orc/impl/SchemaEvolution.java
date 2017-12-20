@@ -403,10 +403,9 @@ public class SchemaEvolution {
             List<String> fileFieldNames = fileType.getFieldNames();
 
             final Map<String, TypeDescription> fileTypesIdx;
-            if ( isSchemaEvolutionCaseAware) {
+            if (isSchemaEvolutionCaseAware) {
               fileTypesIdx = new HashMap<>();
-            }
-            else {
+            } else {
               fileTypesIdx = new CaseInsensitiveMap<TypeDescription>();
             }
             for (int i = 0; i < fileFieldNames.size(); i++) {
@@ -523,9 +522,7 @@ public class SchemaEvolution {
     acidEventFieldNames.add("row");
   }
 
-
-
-  private static class CaseInsensitiveMap<V> extends   HashMap<String,V> {
+  private static class CaseInsensitiveMap<V> extends HashMap<String,V> {
     @Override
     public V put(String key, V value) {
       return super.put(key.toLowerCase(), value);
@@ -535,6 +532,7 @@ public class SchemaEvolution {
     public V get(Object key) {
       return this.get((String) key);
     }
+
     // not @Override as key to be of type Object
     public V get(String key) {
       return super.get(key.toLowerCase());

@@ -40,17 +40,22 @@ public class TestUnmaskRange {
     RedactMaskFactory mask = new RedactMaskFactory("9", "", "0:2");
     long result = mask.maskLong(123456);
     assertEquals(123_999, result);
+    assertEquals(-129_999, mask.maskLong(-123456));
 
     // negative index
     mask = new RedactMaskFactory("9", "", "-3:-1");
     result = mask.maskLong(123456);
     assertEquals(999_456, result);
+    assertEquals(-999_456, mask.maskLong(-123456));
 
     // out of range mask, return the original mask
     mask = new RedactMaskFactory("9", "", "7:10");
     result = mask.maskLong(123456);
     assertEquals(999999, result);
 
+    // if the masked value overflows, we get the overflow answer
+    result = mask.maskLong(1_234_567_890_123_456_789L);
+    assertEquals(999_999_999_999_999_999L, result);
   }
 
   @Test

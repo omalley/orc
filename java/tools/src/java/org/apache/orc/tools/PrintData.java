@@ -132,9 +132,17 @@ public class PrintData {
           writer.value(((LongColumnVector) vector).vector[row]);
           break;
         case FLOAT:
-        case DOUBLE:
-          writer.value(((DoubleColumnVector) vector).vector[row]);
+        case DOUBLE: {
+          double val = ((DoubleColumnVector) vector).vector[row];
+          if (Double.isInfinite(val)) {
+            writer.value("\"infinity\"");
+          } else if (Double.isNaN(val)) {
+            writer.value("\"NaN\"");
+          } else {
+            writer.value(val);
+          }
           break;
+        }
         case STRING:
         case CHAR:
         case VARCHAR:
@@ -242,6 +250,7 @@ public class PrintData {
           System.out.println(FileDump.SEPARATOR);
         } catch (Exception e) {
           System.err.println("Unable to dump data for file: " + file);
+          e.printStackTrace(System.err);
           continue;
         }
       }

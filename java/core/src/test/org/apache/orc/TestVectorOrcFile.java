@@ -1363,12 +1363,11 @@ public class TestVectorOrcFile {
     VectorizedRowBatch batch = schema.createRowBatch();
     batch.size = 1000;
     for (int year = minYear; year < maxYear; ++year) {
-      for (int ms = 1000; ms < 2000; ++ms) {
+      for (int row = 0; row < 1000; ++row) {
         TimestampColumnVector timestampColVector = (TimestampColumnVector) batch.cols[0];
-        timestampColVector.set(ms - 1000,
-            Timestamp.valueOf(year +
-                "-05-05 12:34:56." + ms));
-        ((LongColumnVector) batch.cols[1]).vector[ms - 1000] =
+        Timestamp ts = Timestamp.valueOf(year + "-05-05 12:34:56." + (row + 1000));
+        timestampColVector.set(row, ts);
+        ((LongColumnVector) batch.cols[1]).vector[row] =
             new DateWritable(new Date(year - 1900, 11, 25)).getDays();
       }
       writer.addRowBatch(batch);
@@ -1383,12 +1382,13 @@ public class TestVectorOrcFile {
     for (int year = minYear; year < maxYear; ++year) {
       rows.nextBatch(batch);
       assertEquals(1000, batch.size);
-      for(int ms = 1000; ms < 2000; ++ms) {
+      for(int row = 0; row < 1000; ++row) {
         StringBuilder buffer = new StringBuilder();
-        times.stringifyValue(buffer, ms - 1000);
+        times.stringifyValue(buffer, row);
         String expected = Integer.toString(year) + "-05-05 12:34:56.";
         // suppress the final zeros on the string by dividing by the largest
         // power of 10 that divides evenly.
+        int ms = row + 1000;
         int roundedMs = ms;
         for(int round = 1000; round > 0; round /= 10) {
           if (ms % round == 0) {
@@ -1397,9 +1397,10 @@ public class TestVectorOrcFile {
           }
         }
         expected += roundedMs;
-        assertEquals(expected, buffer.toString());
-        assertEquals(Integer.toString(year) + "-12-25",
-            new DateWritable((int) dates.vector[ms - 1000]).toString());
+        assertEquals("year " + year + " row " + row, expected, buffer.toString());
+        assertEquals("year " + year + " row " + row,
+            Integer.toString(year) + "-12-25",
+            new DateWritable((int) dates.vector[row]).toString());
       }
     }
     rows.nextBatch(batch);

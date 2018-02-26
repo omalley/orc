@@ -975,12 +975,15 @@ public class TreeReaderFactory {
 
       for (int i = 0; i < batchSize; i++) {
         if (result.noNulls || !result.isNull[i]) {
-          long millis = data.next() + base_timestamp;
+          long millis = (data.next() + base_timestamp) * WriterImpl.MILLIS_PER_SECOND;
           int newNanos = parseNanos(nanos.next());
-          if (millis < 0 && newNanos != 0) {
-            millis -= 1;
+          if (newNanos > 0) {
+            if (millis >= 0) {
+              millis += newNanos / 1_000_000;
+            } else {
+              millis -= 1000 - newNanos / 1_000_000;
+            }
           }
-          millis *= WriterImpl.MILLIS_PER_SECOND;
           long offset = 0;
           // If reader and writer time zones have different rules, adjust the timezone difference
           // between reader and writer taking day light savings into account.

@@ -29,18 +29,21 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.TreeMap;
 
 /**
  * This is an in-memory implementation of {@link HadoopShims.KeyProvider}.
- * The primary use of this class is to ease testing.
+ *
+ * The primary use of this class is for when the user doesn't have a
+ * Hadoop KMS running and wishes to use encryption. It is also useful for
+ * testing.
+ *
+ * This class is not thread safe.
  */
 public class InMemoryKeystore implements HadoopShims.KeyProvider {
 
@@ -61,29 +64,26 @@ public class InMemoryKeystore implements HadoopShims.KeyProvider {
    * A map that stores the 'keyName@version'
    * and 'metadata + material' mapping.
    */
-  private final Map<String, KeyVersion> keys;
+  private final TreeMap<String, KeyVersion> keys = new TreeMap<>();
 
   /**
-   * A map that store the keyName (without version)
-   * and metadata associated with it.
+   * A map from the keyName (without version) to the currentVersion.
    */
-  private final Map<String, Deque<HadoopShims.KeyMetadata>> meta = new HashMap<>();
-
-  private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock(true);
+  private final Map<String, Integer> currentVersion = new HashMap<>();
 
   /* Create an instance */
   public InMemoryKeystore() {
-    this(new HashMap<String, KeyVersion>());
+    super();
   }
 
   /**
    * Create an instance populating the given keys.
    *
-   * @param keys Supplied map of keys
+   * @param keys a list of keys that will be added initially
    */
   public InMemoryKeystore(final Map<String, KeyVersion> keys) {
     super();
-    this.keys = keys;
+    this.keys.putAll(keys);
   }
 
   /**
@@ -103,11 +103,10 @@ public class InMemoryKeystore implements HadoopShims.KeyProvider {
    * Get the list of key names from the key provider.
    *
    * @return a list of key names
-   * @throws IOException
    */
   @Override
-  public List<String> getKeyNames() throws IOException {
-    return new ArrayList<>(meta.keySet());
+  public List<String> getKeyNames() {
+    return new ArrayList<>(currentVersion.keySet());
   }
 
   /**
@@ -119,28 +118,7 @@ public class InMemoryKeystore implements HadoopShims.KeyProvider {
    */
   @Override
   public HadoopShims.KeyMetadata getCurrentKeyVersion(final String keyName) {
-    return meta.get(keyName).peekFirst();
-  }
-
-  /**
-   * Return all the versions for a given key
-   *
-   * @param name
-   * @return
-   * @throws IOException
-   */
-  public List<KeyVersion> getKeyVersions(final String name) throws IOException {
-    rwl.readLock().lock();
-    try {
-      final List<KeyVersion> list = new ArrayList<>();
-      for (final HadoopShims.KeyMetadata metaData : meta.get(name)) {
-        list.add(keys.get(
-            buildVersionName(metaData.getKeyName(), metaData.getVersion())));
-      }
-      return list;
-    } finally {
-      rwl.readLock().unlock();
-    }
+    return keys.get(buildVersionName(keyName, currentVersion.get(keyName)));
   }
 
   /**
@@ -190,40 +168,35 @@ public class InMemoryKeystore implements HadoopShims.KeyProvider {
   @Override
   public Key getLocalKey(final HadoopShims.KeyMetadata key, final byte[] iv) {
 
-    rwl.readLock().lock();
+    final KeyVersion secret = keys
+        .get(buildVersionName(key.getKeyName(), key.getVersion()));
+    final EncryptionAlgorithm algorithm = secret.getAlgorithm();
+    final Cipher cipher = algorithm.createCipher();
+
     try {
-      final KeyVersion secret = keys
-          .get(buildVersionName(key.getKeyName(), key.getVersion()));
-      final Cipher cipher = secret.getAlgorithm().createCipher();
-
-      try {
-        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(secret.getMaterial(),
-            secret.getAlgorithm().getAlgorithm()), new IvParameterSpec(iv));
-      } catch (final InvalidKeyException e) {
-        throw new IllegalStateException(
-            "ORC bad encryption key for " + key.getKeyName(), e);
-      } catch (final InvalidAlgorithmParameterException e) {
-        throw new IllegalStateException(
-            "ORC bad encryption parameter for " + key.getKeyName(), e);
-      }
-
-      final byte[] buffer = new byte[secret.getAlgorithm().keyLength()];
-
-      try {
-        cipher.doFinal(buffer);
-      } catch (final IllegalBlockSizeException e) {
-        throw new IllegalStateException(
-            "ORC bad block size for " + key.getKeyName(), e);
-      } catch (final BadPaddingException e) {
-        throw new IllegalStateException(
-            "ORC bad padding for " + key.getKeyName(), e);
-      }
-
-      return new SecretKeySpec(buffer, secret.getAlgorithm().getAlgorithm());
-    } finally {
-      rwl.readLock().unlock();
+      cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(secret.getMaterial(),
+          algorithm.getAlgorithm()), new IvParameterSpec(iv));
+    } catch (final InvalidKeyException e) {
+      throw new IllegalStateException(
+          "ORC bad encryption key for " + key.getKeyName(), e);
+    } catch (final InvalidAlgorithmParameterException e) {
+      throw new IllegalStateException(
+          "ORC bad encryption parameter for " + key.getKeyName(), e);
     }
 
+    byte[] buffer = new byte[algorithm.keyLength()];
+
+    try {
+      buffer = cipher.doFinal(buffer);
+    } catch (final IllegalBlockSizeException e) {
+      throw new IllegalStateException(
+          "ORC bad block size for " + key.getKeyName(), e);
+    } catch (final BadPaddingException e) {
+      throw new IllegalStateException(
+          "ORC bad padding for " + key.getKeyName(), e);
+    }
+
+    return new SecretKeySpec(buffer, algorithm.getAlgorithm());
   }
 
   /**
@@ -237,79 +210,63 @@ public class InMemoryKeystore implements HadoopShims.KeyProvider {
    *
    * @param keyName   Name of the key to be added
    * @param algorithm Algorithm used
-   * @param version   Key Version
    * @param masterKey Master key
-   * @return The new key
+   * @return this
    */
-  public KeyVersion addKey(String keyName, EncryptionAlgorithm algorithm,
-      int version, byte[] masterKey) throws IOException {
+  public InMemoryKeystore addKey(String keyName, EncryptionAlgorithm algorithm,
+                                 byte[] masterKey) throws IOException {
+    return addKey(keyName, 0, algorithm, masterKey);
+  }
+
+    /**
+     * Function that takes care of adding a new key.<br>
+     * A new key can be added only if:
+     * <ul>
+     * <li>This is a new key and no prior key version exist.</li>
+     * <li>If the key exists (has versions), then the new version to be added should be greater than
+     * the version that already exists.</li>
+     * </ul>
+     *
+     * @param keyName   Name of the key to be added
+     * @param version   Key Version
+     * @param algorithm Algorithm used
+     * @param masterKey Master key
+     * @return this
+     */
+  public InMemoryKeystore addKey(String keyName, int version,
+                                 EncryptionAlgorithm algorithm,
+                                 byte[] masterKey) throws IOException {
 
     /* Test weather platform supports the algorithm */
     if (!SUPPORTS_AES_256 && (algorithm != EncryptionAlgorithm.AES_128)) {
       algorithm = EncryptionAlgorithm.AES_128;
     }
 
-    rwl.writeLock().lock();
-    try {
-      final byte[] buffer = new byte[algorithm.keyLength()];
-      if (algorithm.keyLength() > masterKey.length) {
+    final byte[] buffer = new byte[algorithm.keyLength()];
+    if (algorithm.keyLength() > masterKey.length) {
 
-        System.arraycopy(masterKey, 0, buffer, 0, masterKey.length);
-        /* fill with zeros */
-        Arrays.fill(buffer, masterKey.length, buffer.length - 1, (byte) 0);
+      System.arraycopy(masterKey, 0, buffer, 0, masterKey.length);
+      /* fill with zeros */
+      Arrays.fill(buffer, masterKey.length, buffer.length - 1, (byte) 0);
 
-      } else {
-        System.arraycopy(masterKey, 0, buffer, 0, algorithm.keyLength());
-      }
-
-      final KeyVersion key = new KeyVersion(keyName, version, algorithm,
-          buffer);
-
-      /* Check whether the key is already present and has a smaller version */
-      if (meta.get(keyName) != null && meta.get(keyName).peekFirst() != null
-          && meta.get(keyName).peekFirst().getVersion() >= version) {
-        throw new IOException(String
-            .format("Key %s with equal or higher version %d already exists",
-                keyName, version));
-      }
-
-      keys.put(buildVersionName(keyName, version), key);
-      /* our metadata also contains key material, but it should be fine for testing */
-      if (meta.containsKey(keyName)) {
-        meta.get(keyName).addFirst(key);
-      } else {
-        final Deque<HadoopShims.KeyMetadata> stack = new ArrayDeque<>();
-        stack.addFirst(key);
-        meta.put(keyName, stack);
-      }
-
-      return key;
-
-    } finally {
-      rwl.writeLock().unlock();
+    } else {
+      System.arraycopy(masterKey, 0, buffer, 0, algorithm.keyLength());
     }
 
-  }
+    final KeyVersion key = new KeyVersion(keyName, version, algorithm,
+        buffer);
 
-  /**
-   * Roll new version for the key i.e.
-   * increments the version number by 1 and
-   * uses the provided secret material.
-   * <p>
-   * Mainly used for testing.
-   *
-   * @param name     name of the key to be rolled
-   * @param material the new material to be used
-   * @return KeyVersion The new rolled key
-   * @throws IOException
-   */
-  public KeyVersion rollNewVersion(final String name, final byte[] material)
-      throws IOException {
+    /* Check whether the key is already present and has a smaller version */
+    if (currentVersion.get(keyName) != null &&
+        currentVersion.get(keyName) >= version) {
+      throw new IOException(String
+          .format("Key %s with equal or higher version %d already exists",
+              keyName, version));
+    }
 
-    final HadoopShims.KeyMetadata metadata = meta.get(name).peekFirst();
-    final int newVersion = metadata.getVersion() + 1;
-    return addKey(name, metadata.getAlgorithm(), newVersion, material);
-
+    keys.put(buildVersionName(keyName, version), key);
+    currentVersion.put(keyName, version);
+    return this;
   }
 
   /**

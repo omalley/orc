@@ -111,7 +111,7 @@ public final class OrcTail {
         metadata = extractMetadata(serializedTail, 0,
             (int) fileTail.getPostscript().getMetadataLength(), codec, getCompressionBufferSize());
       } finally {
-        OrcCodecPool.returnCodecSafely(getCompressionKind(), codec);
+        OrcCodecPool.returnCodec(getCompressionKind(), codec);
       }
       // clear does not clear the contents but sets position to 0 and limit = capacity
       serializedTail.clear();

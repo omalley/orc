@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -279,7 +279,7 @@ public class RecordReaderUtils {
     @Override
     public void close() throws IOException {
       if (codec != null) {
-        OrcCodecPool.returnCodecSafely(compressionKind, codec);
+        OrcCodecPool.returnCodec(compressionKind, codec);
         codec = null;
       }
       if (pool != null) {
@@ -325,8 +325,6 @@ public class RecordReaderUtils {
 
     @Override
     public CompressionCodec getCompressionCodec() {
-      // Note: see comments in PhysicalFsWriter; we should probably get rid of this usage
-      //       pattern to make error handling for codec pool more robust.
       return codec;
     }
   }

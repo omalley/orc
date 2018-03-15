@@ -229,7 +229,7 @@ public class PhysicalFsWriter implements PhysicalWriter {
     // that is used in tests, for boolean checks, and in StreamFactory. Some of the changes that
     // would get rid of this pattern require cross-project interface changes, so just return the
     // codec for now.
-    OrcCodecPool.returnCodecSafely(compress, codec);
+    OrcCodecPool.returnCodec(compress, codec);
     codec = null;
     rawWriter.close();
     rawWriter = null;

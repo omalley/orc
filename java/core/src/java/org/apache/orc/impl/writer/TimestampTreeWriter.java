@@ -51,9 +51,6 @@ public class TimestampTreeWriter extends TreeWriterBase {
         OrcProto.Stream.Kind.DATA), true, isDirectV2, writer);
     this.nanos = createIntegerWriter(writer.createStream(id,
         OrcProto.Stream.Kind.SECONDARY), false, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
     this.localTimezone = TimeZone.getDefault();
     // for unit tests to set different time zones
     this.baseEpochSecsLocalTz = Timestamp.valueOf(BASE_TIMESTAMP_STRING).getTime() / MILLIS_PER_SECOND;
@@ -132,9 +129,6 @@ public class TimestampTreeWriter extends TreeWriterBase {
     super.writeStripe(builder, stats, requiredIndexEntries);
     seconds.flush();
     nanos.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   private static long formatNanos(int nanos) {
@@ -151,13 +145,6 @@ public class TimestampTreeWriter extends TreeWriterBase {
       }
       return ((long) nanos) << 3 | trailingZeros;
     }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    seconds.getPosition(recorder);
-    nanos.getPosition(recorder);
   }
 
   @Override

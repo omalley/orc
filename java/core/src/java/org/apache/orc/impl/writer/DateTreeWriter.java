@@ -42,9 +42,6 @@ public class DateTreeWriter extends TreeWriterBase {
         OrcProto.Stream.Kind.DATA);
     this.isDirectV2 = isNewWriteFormat(writer);
     this.writer = createIntegerWriter(out, true, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -89,15 +86,6 @@ public class DateTreeWriter extends TreeWriterBase {
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
     writer.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    writer.getPosition(recorder);
   }
 
   @Override

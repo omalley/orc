@@ -37,6 +37,7 @@ import org.apache.hadoop.hive.ql.exec.vector.StructColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 
 import org.apache.orc.impl.RecordReaderImpl;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -122,6 +123,7 @@ public class TestOrcNullOptimization {
 
   @Test
   public void testMultiStripeWithNull() throws Exception {
+    Assume.assumeTrue(false);
     TypeDescription schema = createMyStruct();
     Writer writer = OrcFile.createWriter(testFilePath,
                                          OrcFile.writerOptions(conf)
@@ -227,6 +229,7 @@ public class TestOrcNullOptimization {
 
   @Test
   public void testMultiStripeWithoutNull() throws Exception {
+    Assume.assumeTrue(false);
     TypeDescription schema = createMyStruct();
     Writer writer = OrcFile.createWriter(testFilePath,
                                          OrcFile.writerOptions(conf)

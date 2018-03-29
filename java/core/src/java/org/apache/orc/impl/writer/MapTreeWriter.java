@@ -44,9 +44,6 @@ public class MapTreeWriter extends TreeWriterBase {
     valueWriter = Factory.create(children.get(1), writer, true);
     lengths = createIntegerWriter(writer.createStream(columnId,
         OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -135,15 +132,6 @@ public class MapTreeWriter extends TreeWriterBase {
     lengths.flush();
     keyWriter.writeStripe(builder, stats, requiredIndexEntries);
     valueWriter.writeStripe(builder, stats, requiredIndexEntries);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    lengths.getPosition(recorder);
   }
 
   @Override

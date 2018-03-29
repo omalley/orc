@@ -73,9 +73,6 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
         OrcProto.Stream.Kind.DICTIONARY_LENGTH), false, isDirectV2, writer);
     rowOutput = createIntegerWriter(directStreamOutput, false, isDirectV2,
         writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
     rowIndexValueCount.add(0L);
     buildIndex = writer.buildIndex();
     Configuration conf = writer.getConfiguration();
@@ -133,16 +130,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     dictionary.clear();
     savedRowIndex.clear();
     rowIndexValueCount.clear();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
     rowIndexValueCount.add(0L);
-
-    if (!useDictionaryEncoding) {
-      // record the start positions of first index stride of next stripe i.e
-      // beginning of the direct streams when dictionary is disabled
-      recordDirectStreamPosition();
-    }
   }
 
   private void flushDictionary() throws IOException {
@@ -242,7 +230,6 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     savedRowIndex.add(base);
     rowIndexEntry.clear();
     addBloomFilterEntry();
-    recordPosition(rowIndexPosition);
     rowIndexValueCount.add((long) rows.size());
     if (strideDictionaryCheck) {
       checkDictionaryEncoding();
@@ -250,20 +237,10 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     if (!useDictionaryEncoding) {
       if (rows.size() > 0) {
         flushDictionary();
-        // just record the start positions of next index stride
-        recordDirectStreamPosition();
       } else {
         // record the start positions of next index stride
-        recordDirectStreamPosition();
         getRowIndex().addEntry(base);
       }
-    }
-  }
-
-  private void recordDirectStreamPosition() throws IOException {
-    if (rowIndexPosition != null) {
-      directStreamOutput.getPosition(rowIndexPosition);
-      directLengthOutput.getPosition(rowIndexPosition);
     }
   }
 

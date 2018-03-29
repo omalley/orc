@@ -44,9 +44,6 @@ public class BinaryTreeWriter extends TreeWriterBase {
     this.isDirectV2 = isNewWriteFormat(writer);
     this.length = createIntegerWriter(writer.createStream(id,
         OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -110,16 +107,6 @@ public class BinaryTreeWriter extends TreeWriterBase {
     super.writeStripe(builder, stats, requiredIndexEntries);
     stream.flush();
     length.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    stream.getPosition(recorder);
-    length.getPosition(recorder);
   }
 
   @Override

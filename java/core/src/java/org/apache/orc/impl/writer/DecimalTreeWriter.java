@@ -52,9 +52,6 @@ public class DecimalTreeWriter extends TreeWriterBase {
     scratchBuffer = new byte[HiveDecimal.SCRATCH_BUFFER_LEN_TO_BYTES];
     this.scaleStream = createIntegerWriter(writer.createStream(id,
         OrcProto.Stream.Kind.SECONDARY), true, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -116,16 +113,6 @@ public class DecimalTreeWriter extends TreeWriterBase {
     super.writeStripe(builder, stats, requiredIndexEntries);
     valueStream.flush();
     scaleStream.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    valueStream.getPosition(recorder);
-    scaleStream.getPosition(recorder);
   }
 
   @Override

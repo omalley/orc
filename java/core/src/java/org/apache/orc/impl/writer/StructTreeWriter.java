@@ -40,9 +40,6 @@ public class StructTreeWriter extends TreeWriterBase {
     for (int i = 0; i < childrenWriters.length; ++i) {
       childrenWriters[i] = Factory.create(children.get(i), writer, true);
     }
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -114,9 +111,6 @@ public class StructTreeWriter extends TreeWriterBase {
     super.writeStripe(builder, stats, requiredIndexEntries);
     for (TreeWriter child : childrenWriters) {
       child.writeStripe(builder, stats, requiredIndexEntries);
-    }
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
     }
   }
 

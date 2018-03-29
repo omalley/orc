@@ -41,9 +41,6 @@ public class DoubleTreeWriter extends TreeWriterBase {
     this.stream = writer.createStream(id,
         OrcProto.Stream.Kind.DATA);
     this.utils = new SerializationUtils();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -88,15 +85,6 @@ public class DoubleTreeWriter extends TreeWriterBase {
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
     stream.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    stream.getPosition(recorder);
   }
 
   @Override

@@ -137,10 +137,24 @@ message ColumnEncoding {
   optional uint32 bloomEncoding = 3;
 }
 
+message Column {
+  // the streams come in the order (depending on the type and encoding)
+  // data, length, secondary, present
+  repeated uint32 streamLengths = 1 [packed=true];
+}
+
+message RowGroup {
+  // the columns
+  repeated Column columns = 1;
+  // the number of bytes in this row group
+  optional uint64 length = 2;
+}
+
 message StripeFooter {
   repeated Stream streams = 1;
   repeated ColumnEncoding columns = 2;
   optional string writerTimezone = 3;
+  repeated RowGroup rowGroups = 4;
 }
 
 message Type {

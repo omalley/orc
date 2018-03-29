@@ -40,9 +40,6 @@ public class BooleanTreeWriter extends TreeWriterBase {
     PositionedOutputStream out = writer.createStream(id,
         OrcProto.Stream.Kind.DATA);
     this.writer = new BitFieldWriter(out, 1);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -75,15 +72,6 @@ public class BooleanTreeWriter extends TreeWriterBase {
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
     writer.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    writer.getPosition(recorder);
   }
 
   @Override

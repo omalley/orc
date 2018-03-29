@@ -38,9 +38,6 @@ public class ByteTreeWriter extends TreeWriterBase {
     super(columnId, schema, writer, nullable);
     this.writer = new RunLengthByteWriter(writer.createStream(id,
         OrcProto.Stream.Kind.DATA));
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -85,15 +82,6 @@ public class ByteTreeWriter extends TreeWriterBase {
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
     writer.flush();
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    writer.getPosition(recorder);
   }
 
   @Override

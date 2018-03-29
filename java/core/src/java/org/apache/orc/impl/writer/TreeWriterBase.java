@@ -51,7 +51,6 @@ public abstract class TreeWriterBase implements TreeWriter {
   protected final ColumnStatisticsImpl indexStatistics;
   protected final ColumnStatisticsImpl stripeColStatistics;
   protected final ColumnStatisticsImpl fileStatistics;
-  protected final RowIndexPositionRecorder rowIndexPosition;
   private final OrcProto.RowIndex.Builder rowIndex;
   private final OrcProto.RowIndexEntry.Builder rowIndexEntry;
   protected final BloomFilter bloomFilter;
@@ -93,11 +92,9 @@ public abstract class TreeWriterBase implements TreeWriter {
     if (streamFactory.buildIndex()) {
       rowIndex = OrcProto.RowIndex.newBuilder();
       rowIndexEntry = OrcProto.RowIndexEntry.newBuilder();
-      rowIndexPosition = new RowIndexPositionRecorder(rowIndexEntry);
     } else {
       rowIndex = null;
       rowIndexEntry = null;
-      rowIndexPosition = null;
     }
     if (createBloomFilter) {
       bloomFilterEntry = OrcProto.BloomFilter.newBuilder();
@@ -217,17 +214,6 @@ public abstract class TreeWriterBase implements TreeWriter {
     }
   }
 
-  private void removeIsPresentPositions() {
-    for(int i=0; i < rowIndex.getEntryCount(); ++i) {
-      OrcProto.RowIndexEntry.Builder entry = rowIndex.getEntryBuilder(i);
-      List<Long> positions = entry.getPositionsList();
-      // bit streams use 3 positions if uncompressed, 4 if compressed
-      positions = positions.subList(isCompressed ? 4 : 3, positions.size());
-      entry.clearPositions();
-      entry.addAllPositions(positions);
-    }
-  }
-
   public void writeStripe(OrcProto.StripeFooter.Builder builder,
                           OrcProto.StripeStatistics.Builder stats,
                           int requiredIndexEntries) throws IOException {
@@ -237,11 +223,6 @@ public abstract class TreeWriterBase implements TreeWriter {
       // if no nulls are found in a stream, then suppress the stream
       if(!foundNulls) {
         isPresentOutStream.suppress();
-        // since isPresent bitstream is suppressed, update the index to
-        // remove the positions of the isPresent stream
-        if (rowIndex != null) {
-          removeIsPresentPositions();
-        }
       }
     }
 
@@ -307,7 +288,6 @@ public abstract class TreeWriterBase implements TreeWriter {
     rowIndex.addEntry(rowIndexEntry);
     rowIndexEntry.clear();
     addBloomFilterEntry();
-    recordPosition(rowIndexPosition);
   }
 
   void addBloomFilterEntry() {
@@ -328,16 +308,6 @@ public abstract class TreeWriterBase implements TreeWriter {
   @Override
   public void updateFileStatistics(OrcProto.StripeStatistics stats) {
     fileStatistics.merge(ColumnStatisticsImpl.deserialize(stats.getColStats(id)));
-  }
-
-  /**
-   * Record the current position in each of this column's streams.
-   * @param recorder where should the locations be recorded
-   */
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    if (isPresent != null) {
-      isPresent.getPosition(recorder);
-    }
   }
 
   /**

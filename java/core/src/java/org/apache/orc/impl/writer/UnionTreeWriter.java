@@ -45,9 +45,6 @@ public class UnionTreeWriter extends TreeWriterBase {
     tags =
         new RunLengthByteWriter(writer.createStream(columnId,
             OrcProto.Stream.Kind.DATA));
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -128,15 +125,6 @@ public class UnionTreeWriter extends TreeWriterBase {
     for (TreeWriter child : childrenWriters) {
       child.writeStripe(builder, stats, requiredIndexEntries);
     }
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    tags.getPosition(recorder);
   }
 
   @Override

@@ -41,9 +41,6 @@ public class ListTreeWriter extends TreeWriterBase {
     childWriter = Factory.create(schema.getChildren().get(0), writer, true);
     lengths = createIntegerWriter(writer.createStream(columnId,
         OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
   }
 
   @Override
@@ -125,15 +122,6 @@ public class ListTreeWriter extends TreeWriterBase {
     super.writeStripe(builder, stats, requiredIndexEntries);
     lengths.flush();
     childWriter.writeStripe(builder, stats, requiredIndexEntries);
-    if (rowIndexPosition != null) {
-      recordPosition(rowIndexPosition);
-    }
-  }
-
-  @Override
-  void recordPosition(PositionRecorder recorder) throws IOException {
-    super.recordPosition(recorder);
-    lengths.getPosition(recorder);
   }
 
   @Override

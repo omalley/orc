@@ -49,7 +49,7 @@ public class StringTreeWriter extends StringBaseTreeWriter {
           for (int i = 0; i < length; ++i) {
             directStreamOutput.write(vec.vector[0], vec.start[0],
                 vec.length[0]);
-            lengthOutput.write(vec.length[0]);
+            directLengthOutput.write(vec.length[0]);
           }
         }
         indexStatistics.updateString(vec.vector[0], vec.start[0],
@@ -72,7 +72,7 @@ public class StringTreeWriter extends StringBaseTreeWriter {
           } else {
             directStreamOutput.write(vec.vector[offset + i],
                 vec.start[offset + i], vec.length[offset + i]);
-            lengthOutput.write(vec.length[offset + i]);
+            directLengthOutput.write(vec.length[offset + i]);
           }
           indexStatistics.updateString(vec.vector[offset + i],
               vec.start[offset + i], vec.length[offset + i], 1);

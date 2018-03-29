@@ -1044,7 +1044,7 @@ public class RecordReaderImpl implements RecordReader {
       OrcProto.Stream.Kind streamKind = stream.getKind();
       // since stream kind is optional, first check if it exists
       if (stream.hasKind() &&
-          (StreamName.getArea(streamKind) == StreamName.Area.DATA) &&
+          (StreamName.getArea(streamKind) != StreamName.Area.INDEX) &&
           (column < includedColumns.length && includedColumns[column])) {
         // if we aren't filtering or it is a dictionary, load it.
         if (includedRowGroups == null
@@ -1073,7 +1073,7 @@ public class RecordReaderImpl implements RecordReader {
       if ((includeColumn != null &&
           (column < includeColumn.length && !includeColumn[column])) ||
           streamDesc.hasKind() &&
-              (StreamName.getArea(streamDesc.getKind()) != StreamName.Area.DATA)) {
+              (StreamName.getArea(streamDesc.getKind()) == StreamName.Area.INDEX)) {
         streamOffset += streamDesc.getLength();
         continue;
       }

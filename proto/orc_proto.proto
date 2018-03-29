@@ -110,7 +110,7 @@ message Stream {
     DATA = 1;
     LENGTH = 2;
     DICTIONARY_DATA = 3;
-    DICTIONARY_COUNT = 4;
+    DICTIONARY_LENGTH = 4;
     SECONDARY = 5;
     ROW_INDEX = 6;
     BLOOM_FILTER = 7;

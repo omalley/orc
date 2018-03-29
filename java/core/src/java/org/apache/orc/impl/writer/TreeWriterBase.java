@@ -28,7 +28,6 @@ import org.apache.orc.impl.ColumnStatisticsImpl;
 import org.apache.orc.impl.IntegerWriter;
 import org.apache.orc.impl.OutStream;
 import org.apache.orc.impl.PositionRecorder;
-import org.apache.orc.impl.PositionedOutputStream;
 import org.apache.orc.impl.RunLengthIntegerWriter;
 import org.apache.orc.impl.RunLengthIntegerWriterV2;
 import org.apache.orc.impl.StreamName;
@@ -134,7 +133,7 @@ public abstract class TreeWriterBase implements TreeWriter {
     return rowIndexEntry;
   }
 
-  IntegerWriter createIntegerWriter(PositionedOutputStream output,
+  IntegerWriter createIntegerWriter(OutStream output,
                                     boolean signed, boolean isDirectV2,
                                     WriterContext writer) {
     if (isDirectV2) {

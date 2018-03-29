@@ -1217,7 +1217,7 @@ public class TreeReaderFactory {
     }
 
     protected StringTreeReader(int columnId, InStream present, InStream data, InStream length,
-        InStream dictionary, OrcProto.ColumnEncoding encoding, Context context) throws IOException {
+        InStream dictionary, InStream dictionaryLength, OrcProto.ColumnEncoding encoding, Context context) throws IOException {
       super(columnId, present, context);
       if (encoding != null) {
         switch (encoding.getKind()) {
@@ -1229,7 +1229,7 @@ public class TreeReaderFactory {
           case DICTIONARY:
           case DICTIONARY_V2:
             reader = new StringDictionaryTreeReader(columnId, present, data, length, dictionary,
-                encoding, context);
+                dictionaryLength, encoding, context);
             break;
           default:
             throw new IllegalArgumentException("Unsupported encoding " +
@@ -1473,11 +1473,11 @@ public class TreeReaderFactory {
     private final LongColumnVector scratchlcv;
 
     StringDictionaryTreeReader(int columnId, Context context) throws IOException {
-      this(columnId, null, null, null, null, null, context);
+      this(columnId, null, null, null, null, null, null, context);
     }
 
     protected StringDictionaryTreeReader(int columnId, InStream present, InStream data,
-        InStream length, InStream dictionary, OrcProto.ColumnEncoding encoding,
+        InStream length, InStream dictionary, InStream dictionaryLength, OrcProto.ColumnEncoding encoding,
         Context context) throws IOException {
       super(columnId, present, context);
       scratchlcv = new LongColumnVector();
@@ -1489,8 +1489,8 @@ public class TreeReaderFactory {
         readDictionaryStream(dictionary);
       }
 
-      if (length != null && encoding != null) {
-        readDictionaryLengthStream(length, encoding);
+      if (dictionaryLength != null && encoding != null) {
+        readDictionaryLengthStream(dictionaryLength, encoding);
       }
     }
 
@@ -1516,8 +1516,11 @@ public class TreeReaderFactory {
       readDictionaryStream(in);
 
       // read the lengths
-      name = new StreamName(columnId, OrcProto.Stream.Kind.LENGTH);
+      name = new StreamName(columnId, OrcProto.Stream.Kind.DICTIONARY_LENGTH);
       in = streams.get(name);
+      if (in == null) {
+        in = streams.get(new StreamName(columnId, OrcProto.Stream.Kind.LENGTH));
+      }
       readDictionaryLengthStream(in, stripeFooter.getColumnsList().get(columnId));
 
       // set up the row reader
@@ -1660,12 +1663,12 @@ public class TreeReaderFactory {
     int maxLength;
 
     CharTreeReader(int columnId, int maxLength) throws IOException {
-      this(columnId, maxLength, null, null, null, null, null);
+      this(columnId, maxLength, null, null, null, null, null, null);
     }
 
     protected CharTreeReader(int columnId, int maxLength, InStream present, InStream data,
-        InStream length, InStream dictionary, OrcProto.ColumnEncoding encoding) throws IOException {
-      super(columnId, present, data, length, dictionary, encoding, null);
+        InStream length, InStream dictionary, InStream dictionaryLength, OrcProto.ColumnEncoding encoding) throws IOException {
+      super(columnId, present, data, length, dictionary, dictionaryLength, encoding, null);
       this.maxLength = maxLength;
     }
 
@@ -1716,12 +1719,12 @@ public class TreeReaderFactory {
     int maxLength;
 
     VarcharTreeReader(int columnId, int maxLength) throws IOException {
-      this(columnId, maxLength, null, null, null, null, null);
+      this(columnId, maxLength, null, null, null, null, null, null);
     }
 
     protected VarcharTreeReader(int columnId, int maxLength, InStream present, InStream data,
-        InStream length, InStream dictionary, OrcProto.ColumnEncoding encoding) throws IOException {
-      super(columnId, present, data, length, dictionary, encoding, null);
+        InStream length, InStream dictionary, InStream dictionaryLength, OrcProto.ColumnEncoding encoding) throws IOException {
+      super(columnId, present, data, length, dictionary, dictionaryLength, encoding, null);
       this.maxLength = maxLength;
     }
 

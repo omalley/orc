@@ -56,7 +56,7 @@ public class VarcharTreeWriter extends StringBaseTreeWriter {
           for(int i=0; i < length; ++i) {
             directStreamOutput.write(vec.vector[0], vec.start[0],
                 itemLength);
-            lengthOutput.write(itemLength);
+            directLengthOutput.write(itemLength);
           }
         }
         indexStatistics.updateString(vec.vector[0], vec.start[0],
@@ -82,7 +82,7 @@ public class VarcharTreeWriter extends StringBaseTreeWriter {
           } else {
             directStreamOutput.write(vec.vector[offset + i],
                 vec.start[offset + i], itemLength);
-            lengthOutput.write(itemLength);
+            directLengthOutput.write(itemLength);
           }
           indexStatistics.updateString(vec.vector[offset + i],
               vec.start[offset + i], itemLength, 1);

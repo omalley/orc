@@ -285,7 +285,7 @@ public class WriterImpl implements Writer, MemoryManager.Callback {
           }
           break;
         case LENGTH:
-        case DICTIONARY_COUNT:
+        case DICTIONARY_LENGTH:
         case PRESENT:
         case ROW_INDEX:
         case SECONDARY:

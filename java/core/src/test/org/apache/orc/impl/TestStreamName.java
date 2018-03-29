@@ -30,20 +30,25 @@ public class TestStreamName {
     StreamName s1 = new StreamName(3, OrcProto.Stream.Kind.DATA);
     StreamName s2 = new StreamName(3,
         OrcProto.Stream.Kind.DICTIONARY_DATA);
+    StreamName s1p = new StreamName(3, OrcProto.Stream.Kind.PRESENT);
     StreamName s3 = new StreamName(5, OrcProto.Stream.Kind.DATA);
     StreamName s4 = new StreamName(5,
         OrcProto.Stream.Kind.DICTIONARY_DATA);
-    StreamName s1p = new StreamName(3, OrcProto.Stream.Kind.DATA);
+    StreamName s1copy = new StreamName(3, OrcProto.Stream.Kind.DATA);
     assertEquals(true, s1.equals(s1));
     assertEquals(false, s1.equals(s2));
+    assertEquals(false, s1.equals(s1p));
     assertEquals(false, s1.equals(s3));
-    assertEquals(true, s1.equals(s1p));
-    assertEquals(true, s1.compareTo(null) < 0);
+    assertEquals(true, s1.equals(s1copy));
     assertEquals(false, s1.equals(null));
-    assertEquals(true, s1.compareTo(s2) < 0);
+
+    assertEquals(true, s1.compareTo(null) < 0);
+    assertEquals(true, s1.compareTo(s2) > 0);
+    assertEquals(true, s1.compareTo(s1p) > 0);
+    assertEquals(true, s2.compareTo(s1p) < 0);
     assertEquals(true, s2.compareTo(s3) < 0);
-    assertEquals(true, s3.compareTo(s4) < 0);
-    assertEquals(true, s4.compareTo(s1p) > 0);
-    assertEquals(0, s1p.compareTo(s1));
+    assertEquals(true, s3.compareTo(s4) > 0);
+    assertEquals(true, s4.compareTo(s1copy) < 0);
+    assertEquals(0, s1copy.compareTo(s1));
   }
 }

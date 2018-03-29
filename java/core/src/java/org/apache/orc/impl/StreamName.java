@@ -27,8 +27,8 @@ public class StreamName implements Comparable<StreamName> {
   private final int column;
   private final OrcProto.Stream.Kind kind;
 
-  public static enum Area {
-    DATA, INDEX
+  public enum Area {
+    DATA, DICTIONARY, INDEX
   }
 
   public StreamName(int column, OrcProto.Stream.Kind kind) {
@@ -76,10 +76,12 @@ public class StreamName implements Comparable<StreamName> {
   public static Area getArea(OrcProto.Stream.Kind kind) {
     switch (kind) {
       case ROW_INDEX:
-      case DICTIONARY_COUNT:
       case BLOOM_FILTER:
       case BLOOM_FILTER_UTF8:
         return Area.INDEX;
+      case DICTIONARY_DATA:
+      case DICTIONARY_LENGTH:
+        return Area.DICTIONARY;
       default:
         return Area.DATA;
     }

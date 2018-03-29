@@ -50,4 +50,6 @@ public interface IntegerWriter {
    * @return number of bytes
    */
   long estimateMemory();
+
+  void suppress();
 }

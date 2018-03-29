@@ -69,7 +69,7 @@ public class CharTreeWriter extends StringBaseTreeWriter {
         } else {
           for(int i=0; i < length; ++i) {
             directStreamOutput.write(ptr, ptrOffset, itemLength);
-            lengthOutput.write(itemLength);
+            directLengthOutput.write(itemLength);
           }
         }
         indexStatistics.updateString(ptr, ptrOffset, itemLength, length);
@@ -102,7 +102,7 @@ public class CharTreeWriter extends StringBaseTreeWriter {
             rows.add(dictionary.add(ptr, ptrOffset, itemLength));
           } else {
             directStreamOutput.write(ptr, ptrOffset, itemLength);
-            lengthOutput.write(itemLength);
+            directLengthOutput.write(itemLength);
           }
           indexStatistics.updateString(ptr, ptrOffset, itemLength, 1);
           if (createBloomFilter) {

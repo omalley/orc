@@ -44,7 +44,8 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
   protected final StringRedBlackTree dictionary =
       new StringRedBlackTree(INITIAL_DICTIONARY_SIZE);
   protected final DynamicIntArray rows = new DynamicIntArray();
-  protected final PositionedOutputStream directStreamOutput;
+  protected final OutStream directStreamOutput;
+  protected final IntegerWriter directLengthOutput;
   private final List<OrcProto.RowIndexEntry> savedRowIndex =
       new ArrayList<>();
   private final boolean buildIndex;
@@ -64,10 +65,12 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     super(columnId, schema, writer, nullable);
     this.isDirectV2 = isNewWriteFormat(writer);
     directStreamOutput = writer.createStream(id, OrcProto.Stream.Kind.DATA);
+    directLengthOutput = createIntegerWriter(writer.createStream(id,
+        OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
     stringOutput = writer.createStream(id,
         OrcProto.Stream.Kind.DICTIONARY_DATA);
     lengthOutput = createIntegerWriter(writer.createStream(id,
-        OrcProto.Stream.Kind.LENGTH), false, isDirectV2, writer);
+        OrcProto.Stream.Kind.DICTIONARY_LENGTH), false, isDirectV2, writer);
     rowOutput = createIntegerWriter(directStreamOutput, false, isDirectV2,
         writer);
     if (rowIndexPosition != null) {
@@ -112,6 +115,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
 
       // suppress the stream for every stripe if dictionary is disabled
       stringOutput.suppress();
+      lengthOutput.suppress();
     }
 
     // we need to build the rowindex before calling super, since it
@@ -123,7 +127,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
       rowOutput.flush();
     } else {
       directStreamOutput.flush();
-      lengthOutput.flush();
+      directLengthOutput.flush();
     }
     // reset all of the fields to be ready for the next stripe.
     dictionary.clear();
@@ -160,9 +164,11 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
           dumpOrder[context.getOriginalPosition()] = currentId++;
         }
       });
+      directLengthOutput.suppress();
     } else {
       // for direct encoding, we don't want the dictionary data stream
       stringOutput.suppress();
+      lengthOutput.suppress();
     }
     int length = rows.size();
     int rowIndexEntry = 0;
@@ -182,7 +188,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
           } else {
             PositionRecorder posn = new RowIndexPositionRecorder(base);
             directStreamOutput.getPosition(posn);
-            lengthOutput.getPosition(posn);
+            directLengthOutput.getPosition(posn);
           }
           rowIndex.addEntry(base.build());
         }
@@ -193,7 +199,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
         } else {
           dictionary.getText(text, rows.get(i));
           directStreamOutput.write(text.getBytes(), 0, text.getLength());
-          lengthOutput.write(text.getLength());
+          directLengthOutput.write(text.getLength());
         }
       }
     }
@@ -257,7 +263,7 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
   private void recordDirectStreamPosition() throws IOException {
     if (rowIndexPosition != null) {
       directStreamOutput.getPosition(rowIndexPosition);
-      lengthOutput.getPosition(rowIndexPosition);
+      directLengthOutput.getPosition(rowIndexPosition);
     }
   }
 

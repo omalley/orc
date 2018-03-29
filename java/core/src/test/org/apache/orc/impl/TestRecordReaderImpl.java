@@ -1393,7 +1393,7 @@ public class TestRecordReaderImpl {
         .setKind(OrcProto.Stream.Kind.DATA)
         .setColumn(1).setLength(94000).build());
     streams.add(OrcProto.Stream.newBuilder()
-        .setKind(OrcProto.Stream.Kind.LENGTH)
+        .setKind(OrcProto.Stream.Kind.DICTIONARY_LENGTH)
         .setColumn(1).setLength(2000).build());
     streams.add(OrcProto.Stream.newBuilder()
         .setKind(OrcProto.Stream.Kind.DICTIONARY_DATA)

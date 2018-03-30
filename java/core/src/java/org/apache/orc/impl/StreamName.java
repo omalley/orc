@@ -45,6 +45,18 @@ public class StreamName implements Comparable<StreamName> {
     }
   }
 
+  private static int compareTo(OrcProto.Stream.Kind left,
+                               OrcProto.Stream.Kind right) {
+    if (left != right &&
+        (left == OrcProto.Stream.Kind.PRESENT ||
+            right == OrcProto.Stream.Kind.PRESENT)) {
+      // override the order to put present at the end
+      return left == OrcProto.Stream.Kind.PRESENT ? 1 : -1;
+    } else {
+      return left.compareTo(right);
+    }
+  }
+
   @Override
   public int compareTo(StreamName streamName) {
     if (streamName == null) {
@@ -58,7 +70,7 @@ public class StreamName implements Comparable<StreamName> {
     if (column != streamName.column) {
       return column < streamName.column ? -1 : 1;
     }
-    return kind.compareTo(streamName.kind);
+    return compareTo(kind, streamName.kind);
   }
 
   public int getColumn() {

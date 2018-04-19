@@ -18,6 +18,7 @@
 
 package org.apache.orc.impl.writer;
 
+import com.jcraft.jsch.IO;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.io.Text;
@@ -40,23 +41,18 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
   private static final int INITIAL_DICTIONARY_SIZE = 4096;
   private final OutStream stringOutput;
   protected final IntegerWriter lengthOutput;
-  private final IntegerWriter rowOutput;
+  protected final IntegerWriter rowOutput;
   protected final StringRedBlackTree dictionary =
       new StringRedBlackTree(INITIAL_DICTIONARY_SIZE);
   protected final DynamicIntArray rows = new DynamicIntArray();
   protected final OutStream directStreamOutput;
   protected final IntegerWriter directLengthOutput;
-  private final List<OrcProto.RowIndexEntry> savedRowIndex =
-      new ArrayList<>();
-  private final boolean buildIndex;
-  private final List<Long> rowIndexValueCount = new ArrayList<>();
   // If the number of keys in a dictionary is greater than this fraction of
   //the total number of non-null rows, turn off dictionary encoding
   private final double dictionaryKeySizeThreshold;
   protected boolean useDictionaryEncoding = true;
-  private boolean isDirectV2 = true;
-  private boolean doneDictionaryCheck;
-  private final boolean strideDictionaryCheck;
+  private boolean isDirectV2;
+  protected boolean doneDictionaryCheck;
 
   StringBaseTreeWriter(int columnId,
                        TypeDescription schema,
@@ -73,17 +69,13 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
         OrcProto.Stream.Kind.DICTIONARY_LENGTH), false, isDirectV2, writer);
     rowOutput = createIntegerWriter(directStreamOutput, false, isDirectV2,
         writer);
-    rowIndexValueCount.add(0L);
-    buildIndex = writer.buildIndex();
     Configuration conf = writer.getConfiguration();
     dictionaryKeySizeThreshold =
         OrcConf.DICTIONARY_KEY_SIZE_THRESHOLD.getDouble(conf);
-    strideDictionaryCheck =
-        OrcConf.ROW_INDEX_STRIDE_DICTIONARY_CHECK.getBoolean(conf);
     doneDictionaryCheck = false;
   }
 
-  private void checkDictionaryEncoding() {
+  private void checkDictionaryEncoding() throws IOException {
     if (!doneDictionaryCheck) {
       // Set the flag indicating whether or not to use dictionary encoding
       // based on whether or not the fraction of distinct keys over number of
@@ -91,6 +83,53 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
       float ratio = rows.size() > 0 ? (float) (dictionary.size()) / rows.size() : 0.0f;
       useDictionaryEncoding = !isDirectV2 || ratio <= dictionaryKeySizeThreshold;
       doneDictionaryCheck = true;
+      if (useDictionaryEncoding) {
+        writeDictionaryRows();
+      } else {
+        convertToDirect();
+      }
+    }
+  }
+
+  /**
+   * Write the buffered rows to the stream once the writer has committed to
+   * using a dictionary for this column.
+   */
+  private void writeDictionaryRows() throws IOException {
+    for(int r=0; r < rows.size(); ++r) {
+      rowOutput.write(rows.get(r));
+    }
+    rows.clear();
+  }
+
+  /**
+   * Switch to a direct encoding.
+   */
+  private void convertToDirect() throws IOException {
+    Text value = new Text();
+    for(int r=0; r < rows.size(); ++r) {
+      int entry = rows.get(r);
+      dictionary.getText(value, entry);
+      directStreamOutput.write(value.getBytes(), 0, value.getLength());
+      directLengthOutput.write(value.getLength());
+    }
+    dictionary.clear();
+    rows.clear();
+  }
+
+  @Override
+  public void flushStreams() throws IOException {
+    checkDictionaryEncoding();
+    super.flushStreams();
+    if (useDictionaryEncoding) {
+      rowOutput.flush();
+      directStreamOutput.suppress();
+      directLengthOutput.suppress();
+    } else {
+      directLengthOutput.flush();
+      directStreamOutput.flush();
+      rowOutput.suppress();
+      lengthOutput.suppress();
     }
   }
 
@@ -101,97 +140,21 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     // if rows in stripe is less than dictionaryCheckAfterRows, dictionary
     // checking would not have happened. So do it again here.
     checkDictionaryEncoding();
-
-    if (useDictionaryEncoding) {
-      flushDictionary();
-    } else {
-      // flushout any left over entries from dictionary
-      if (rows.size() > 0) {
-        flushDictionary();
-      }
-
-      // suppress the stream for every stripe if dictionary is disabled
-      stringOutput.suppress();
-      lengthOutput.suppress();
-    }
-
-    // we need to build the rowindex before calling super, since it
-    // writes it out.
     super.writeStripe(builder, stats, requiredIndexEntries);
+
     if (useDictionaryEncoding) {
-      stringOutput.flush();
-      lengthOutput.flush();
-      rowOutput.flush();
-    } else {
-      directStreamOutput.flush();
-      directLengthOutput.flush();
+      writeDictionary();
     }
-    // reset all of the fields to be ready for the next stripe.
-    dictionary.clear();
-    savedRowIndex.clear();
-    rowIndexValueCount.clear();
-    rowIndexValueCount.add(0L);
   }
 
-  private void flushDictionary() throws IOException {
-    final int[] dumpOrder = new int[dictionary.size()];
-
-    if (useDictionaryEncoding) {
-      // Write the dictionary by traversing the red-black tree writing out
-      // the bytes and lengths; and creating the map from the original order
-      // to the final sorted order.
-
-      dictionary.visit(new StringRedBlackTree.Visitor() {
-        private int currentId = 0;
-
-        @Override
-        public void visit(StringRedBlackTree.VisitorContext context
-        ) throws IOException {
-          context.writeBytes(stringOutput);
-          lengthOutput.write(context.getLength());
-          dumpOrder[context.getOriginalPosition()] = currentId++;
-        }
-      });
-      directLengthOutput.suppress();
-    } else {
-      // for direct encoding, we don't want the dictionary data stream
-      stringOutput.suppress();
-      lengthOutput.suppress();
+  private void writeDictionary() throws IOException {
+    Text value = new Text();
+    for(int e=0; e < dictionary.size(); ++e) {
+      dictionary.getText(value, e);
+      stringOutput.write(value.getBytes(), 0, value.getLength());
+      lengthOutput.write(value.getLength());
     }
-    int length = rows.size();
-    int rowIndexEntry = 0;
-    OrcProto.RowIndex.Builder rowIndex = getRowIndex();
-    Text text = new Text();
-    // write the values translated into the dump order.
-    for (int i = 0; i <= length; ++i) {
-      // now that we are writing out the row values, we can finalize the
-      // row index
-      if (buildIndex) {
-        while (i == rowIndexValueCount.get(rowIndexEntry) &&
-            rowIndexEntry < savedRowIndex.size()) {
-          OrcProto.RowIndexEntry.Builder base =
-              savedRowIndex.get(rowIndexEntry++).toBuilder();
-          if (useDictionaryEncoding) {
-            rowOutput.getPosition(new RowIndexPositionRecorder(base));
-          } else {
-            PositionRecorder posn = new RowIndexPositionRecorder(base);
-            directStreamOutput.getPosition(posn);
-            directLengthOutput.getPosition(posn);
-          }
-          rowIndex.addEntry(base.build());
-        }
-      }
-      if (i != length) {
-        if (useDictionaryEncoding) {
-          rowOutput.write(dumpOrder[rows.get(i)]);
-        } else {
-          dictionary.getText(text, rows.get(i));
-          directStreamOutput.write(text.getBytes(), 0, text.getLength());
-          directLengthOutput.write(text.getLength());
-        }
-      }
-    }
-    rows.clear();
+    dictionary.clear();
   }
 
   @Override
@@ -212,36 +175,6 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
       }
     }
     return result;
-  }
-
-  /**
-   * This method doesn't call the super method, because unlike most of the
-   * other TreeWriters, this one can't record the position in the streams
-   * until the stripe is being flushed. Therefore it saves all of the entries
-   * and augments them with the final information as the stripe is written.
-   */
-  @Override
-  public void createRowIndexEntry() throws IOException {
-    getStripeStatistics().merge(indexStatistics);
-    OrcProto.RowIndexEntry.Builder rowIndexEntry = getRowIndexEntry();
-    rowIndexEntry.setStatistics(indexStatistics.serialize());
-    indexStatistics.reset();
-    OrcProto.RowIndexEntry base = rowIndexEntry.build();
-    savedRowIndex.add(base);
-    rowIndexEntry.clear();
-    addBloomFilterEntry();
-    rowIndexValueCount.add((long) rows.size());
-    if (strideDictionaryCheck) {
-      checkDictionaryEncoding();
-    }
-    if (!useDictionaryEncoding) {
-      if (rows.size() > 0) {
-        flushDictionary();
-      } else {
-        // record the start positions of next index stride
-        getRowIndex().addEntry(base);
-      }
-    }
   }
 
   @Override

@@ -40,16 +40,25 @@ public class StringTreeWriter extends StringBaseTreeWriter {
     BytesColumnVector vec = (BytesColumnVector) vector;
     if (vector.isRepeating) {
       if (vector.noNulls || !vector.isNull[0]) {
-        if (useDictionaryEncoding) {
-          int id = dictionary.add(vec.vector[0], vec.start[0], vec.length[0]);
-          for (int i = 0; i < length; ++i) {
-            rows.add(id);
+        if (doneDictionaryCheck) {
+          if (useDictionaryEncoding) {
+            int entry = dictionary.add(vec.vector[0],
+                vec.start[0], vec.length[0]);
+            for(int r=0; r < length; ++r) {
+              rowOutput.write(entry);
+            }
+          } else {
+            for(int r=0; r < length; ++r) {
+              directStreamOutput.write(vec.vector[0],
+                  vec.start[0], vec.length[0]);
+              directLengthOutput.write(vec.length[0]);
+            }
           }
         } else {
-          for (int i = 0; i < length; ++i) {
-            directStreamOutput.write(vec.vector[0], vec.start[0],
-                vec.length[0]);
-            directLengthOutput.write(vec.length[0]);
+          int entry = dictionary.add(vec.vector[0],
+              vec.start[0], vec.length[0]);
+          for(int r=0; r < length; ++r) {
+            rows.add(entry);
           }
         }
         indexStatistics.updateString(vec.vector[0], vec.start[0],
@@ -66,13 +75,18 @@ public class StringTreeWriter extends StringBaseTreeWriter {
     } else {
       for (int i = 0; i < length; ++i) {
         if (vec.noNulls || !vec.isNull[i + offset]) {
-          if (useDictionaryEncoding) {
+          if (doneDictionaryCheck) {
+            if (useDictionaryEncoding) {
+              rowOutput.write(dictionary.add(vec.vector[offset + i],
+                  vec.start[offset + i], vec.length[offset + i]));
+            } else {
+              directStreamOutput.write(vec.vector[offset + i],
+                  vec.start[offset + i], vec.length[offset + i]);
+              directLengthOutput.write(vec.length[offset + i]);
+            }
+          } else {
             rows.add(dictionary.add(vec.vector[offset + i],
                 vec.start[offset + i], vec.length[offset + i]));
-          } else {
-            directStreamOutput.write(vec.vector[offset + i],
-                vec.start[offset + i], vec.length[offset + i]);
-            directLengthOutput.write(vec.length[offset + i]);
           }
           indexStatistics.updateString(vec.vector[offset + i],
               vec.start[offset + i], vec.length[offset + i], 1);

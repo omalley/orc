@@ -79,12 +79,9 @@ public class FloatTreeWriter extends TreeWriterBase {
     }
   }
 
-
   @Override
-  public void writeStripe(OrcProto.StripeFooter.Builder builder,
-                          OrcProto.StripeStatistics.Builder stats,
-                          int requiredIndexEntries) throws IOException {
-    super.writeStripe(builder, stats, requiredIndexEntries);
+  public void flushStreams() throws IOException {
+    super.flushStreams();
     stream.flush();
   }
 

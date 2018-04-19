@@ -47,7 +47,6 @@ import java.util.List;
 public abstract class TreeWriterBase implements TreeWriter {
   protected final int id;
   protected final BitFieldWriter isPresent;
-  private final boolean isCompressed;
   protected final ColumnStatisticsImpl indexStatistics;
   protected final ColumnStatisticsImpl stripeColStatistics;
   protected final ColumnStatisticsImpl fileStatistics;
@@ -75,7 +74,6 @@ public abstract class TreeWriterBase implements TreeWriter {
                  WriterContext streamFactory,
                  boolean nullable) throws IOException {
     this.streamFactory = streamFactory;
-    this.isCompressed = streamFactory.isCompressed();
     this.id = columnId;
     if (nullable) {
       isPresentOutStream = streamFactory.createStream(id,
@@ -214,9 +212,8 @@ public abstract class TreeWriterBase implements TreeWriter {
     }
   }
 
-  public void writeStripe(OrcProto.StripeFooter.Builder builder,
-                          OrcProto.StripeStatistics.Builder stats,
-                          int requiredIndexEntries) throws IOException {
+  @Override
+  public void flushStreams() throws IOException {
     if (isPresent != null) {
       isPresent.flush();
 
@@ -225,6 +222,12 @@ public abstract class TreeWriterBase implements TreeWriter {
         isPresentOutStream.suppress();
       }
     }
+  }
+
+  @Override
+  public void writeStripe(OrcProto.StripeFooter.Builder builder,
+                          OrcProto.StripeStatistics.Builder stats,
+                          int requiredIndexEntries) throws IOException {
 
     // merge stripe-level column statistics to file statistics and write it to
     // stripe statistics

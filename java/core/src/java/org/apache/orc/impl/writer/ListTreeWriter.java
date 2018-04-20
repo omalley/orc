@@ -116,11 +116,17 @@ public class ListTreeWriter extends TreeWriterBase {
   }
 
   @Override
+  public void flushStreams() throws IOException {
+    super.flushStreams();
+    lengths.flush();
+    childWriter.flushStreams();
+  }
+
+  @Override
   public void writeStripe(OrcProto.StripeFooter.Builder builder,
                           OrcProto.StripeStatistics.Builder stats,
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
-    lengths.flush();
     childWriter.writeStripe(builder, stats, requiredIndexEntries);
   }
 

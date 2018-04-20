@@ -49,8 +49,14 @@ public class VarcharTreeWriter extends StringBaseTreeWriter {
         int itemLength = Math.min(vec.length[0], maxLength);
         if (useDictionaryEncoding) {
           int id = dictionary.add(vec.vector[0], vec.start[0], itemLength);
-          for(int i=0; i < length; ++i) {
-            rows.add(id);
+          if (doneDictionaryCheck) {
+            for (int i = 0; i < length; ++i) {
+              rowOutput.write(id);
+            }
+          } else {
+            for (int i = 0; i < length; ++i) {
+              rows.add(id);
+            }
           }
         } else {
           for(int i=0; i < length; ++i) {
@@ -77,8 +83,13 @@ public class VarcharTreeWriter extends StringBaseTreeWriter {
         if (vec.noNulls || !vec.isNull[i + offset]) {
           int itemLength = Math.min(vec.length[offset + i], maxLength);
           if (useDictionaryEncoding) {
-            rows.add(dictionary.add(vec.vector[offset + i],
-                vec.start[offset + i], itemLength));
+            int entry = dictionary.add(vec.vector[offset + i],
+                vec.start[offset + i], itemLength);
+            if (doneDictionaryCheck) {
+              rowOutput.write(entry);
+            } else {
+              rows.add(entry);
+            }
           } else {
             directStreamOutput.write(vec.vector[offset + i],
                 vec.start[offset + i], itemLength);

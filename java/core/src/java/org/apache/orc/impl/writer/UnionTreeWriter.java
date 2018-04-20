@@ -117,11 +117,19 @@ public class UnionTreeWriter extends TreeWriterBase {
   }
 
   @Override
+  public void flushStreams() throws IOException {
+    super.flushStreams();
+    tags.flush();
+    for (TreeWriter child : childrenWriters) {
+      child.flushStreams();
+    }
+  }
+
+  @Override
   public void writeStripe(OrcProto.StripeFooter.Builder builder,
                           OrcProto.StripeStatistics.Builder stats,
                           int requiredIndexEntries) throws IOException {
     super.writeStripe(builder, stats, requiredIndexEntries);
-    tags.flush();
     for (TreeWriter child : childrenWriters) {
       child.writeStripe(builder, stats, requiredIndexEntries);
     }

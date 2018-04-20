@@ -50,7 +50,7 @@ public class TestStringDictionary {
   public void openFileSystem() throws Exception {
     conf = new Configuration();
     fs = FileSystem.getLocal(conf);
-    testFilePath = new Path(workDir, "TestOrcFile." + testCaseName.getMethodName() + ".orc");
+    testFilePath = new Path(workDir, "TestStringDictionary." + testCaseName.getMethodName() + ".orc");
     fs.delete(testFilePath, false);
   }
 

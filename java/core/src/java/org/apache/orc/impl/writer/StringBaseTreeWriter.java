@@ -123,12 +123,11 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
     super.flushStreams();
     if (useDictionaryEncoding) {
       rowOutput.flush();
-      directStreamOutput.suppress();
       directLengthOutput.suppress();
     } else {
       directLengthOutput.flush();
       directStreamOutput.flush();
-      rowOutput.suppress();
+      stringOutput.suppress();
       lengthOutput.suppress();
     }
   }
@@ -137,9 +136,6 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
   public void writeStripe(OrcProto.StripeFooter.Builder builder,
                           OrcProto.StripeStatistics.Builder stats,
                           int requiredIndexEntries) throws IOException {
-    // if rows in stripe is less than dictionaryCheckAfterRows, dictionary
-    // checking would not have happened. So do it again here.
-    checkDictionaryEncoding();
     super.writeStripe(builder, stats, requiredIndexEntries);
 
     if (useDictionaryEncoding) {
@@ -154,6 +150,8 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
       stringOutput.write(value.getBytes(), 0, value.getLength());
       lengthOutput.write(value.getLength());
     }
+    stringOutput.flush();
+    lengthOutput.flush();
     dictionary.clear();
   }
 

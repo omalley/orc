@@ -63,8 +63,14 @@ public class CharTreeWriter extends StringBaseTreeWriter {
         }
         if (useDictionaryEncoding) {
           int id = dictionary.add(ptr, ptrOffset, itemLength);
-          for(int i=0; i < length; ++i) {
-            rows.add(id);
+          if (doneDictionaryCheck) {
+            for(int i=0; i < length; ++i) {
+              rowOutput.write(id);
+            }
+          } else {
+            for(int i=0; i < length; ++i) {
+              rows.add(id);
+            }
           }
         } else {
           for(int i=0; i < length; ++i) {
@@ -98,11 +104,15 @@ public class CharTreeWriter extends StringBaseTreeWriter {
                 ptr, 0, vec.length[offset + i]);
             Arrays.fill(ptr, vec.length[offset + i], itemLength, (byte) ' ');
           }
-          if (useDictionaryEncoding) {
-            rows.add(dictionary.add(ptr, ptrOffset, itemLength));
+          if (doneDictionaryCheck) {
+            if (useDictionaryEncoding) {
+              rowOutput.write(dictionary.add(ptr, ptrOffset, itemLength));
+            } else {
+              directStreamOutput.write(ptr, ptrOffset, itemLength);
+              directLengthOutput.write(itemLength);
+            }
           } else {
-            directStreamOutput.write(ptr, ptrOffset, itemLength);
-            directLengthOutput.write(itemLength);
+            rows.add(dictionary.add(ptr, ptrOffset, itemLength));
           }
           indexStatistics.updateString(ptr, ptrOffset, itemLength, 1);
           if (createBloomFilter) {

@@ -420,6 +420,7 @@ public class WriterImpl implements Writer, MemoryManager.Callback {
       if (callback != null) {
         callback.preStripeWrite(callbackContext);
       }
+      treeWriter.flushStreams();
       // finalize the data for the stripe
       int requiredIndexEntries = rowIndexStride == 0 ? 0 :
           (int) ((rowsInStripe + rowIndexStride - 1) / rowIndexStride);

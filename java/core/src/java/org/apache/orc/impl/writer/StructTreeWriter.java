@@ -105,6 +105,14 @@ public class StructTreeWriter extends TreeWriterBase {
   }
 
   @Override
+  public void flushStreams() throws IOException {
+    super.flushStreams();
+    for (TreeWriter child : childrenWriters) {
+      child.flushStreams();
+    }
+  }
+
+  @Override
   public void writeStripe(OrcProto.StripeFooter.Builder builder,
                           OrcProto.StripeStatistics.Builder stats,
                           int requiredIndexEntries) throws IOException {

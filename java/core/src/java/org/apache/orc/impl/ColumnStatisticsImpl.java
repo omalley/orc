@@ -1267,9 +1267,7 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
       count = stats.getNumberOfValues();
     }
 
-    if(stats.hasBytesOnDisk()) {
-      bytesOnDisk = stats.getBytesOnDisk();
-    }
+    bytesOnDisk = stats.hasBytesOnDisk() ? stats.getBytesOnDisk() : 0;
 
     if (stats.hasHasNull()) {
       hasNull = stats.getHasNull();
@@ -1380,12 +1378,13 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
    */
   @Override
   public long getBytesOnDisk() {
-    return 0;
+    return bytesOnDisk;
   }
 
   @Override
   public String toString() {
-    return "count: " + count + " hasNull: " + hasNull + " bytesOnDisk: " + bytesOnDisk;
+    return "count: " + count + " hasNull: " + hasNull +
+        (bytesOnDisk != 0 ? " bytesOnDisk: " + bytesOnDisk : "");
   }
 
   public OrcProto.ColumnStatistics.Builder serialize() {
@@ -1393,7 +1392,9 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
       OrcProto.ColumnStatistics.newBuilder();
     builder.setNumberOfValues(count);
     builder.setHasNull(hasNull);
-    builder.setBytesOnDisk(bytesOnDisk);
+    if (bytesOnDisk != 0) {
+      builder.setBytesOnDisk(bytesOnDisk);
+    }
     return builder;
   }
 

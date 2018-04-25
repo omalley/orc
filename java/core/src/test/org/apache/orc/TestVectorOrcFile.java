@@ -211,13 +211,13 @@ public class TestVectorOrcFile {
     assertEquals(7500, stats[1].getNumberOfValues());
     assertEquals(3750, ((BooleanColumnStatistics) stats[1]).getFalseCount());
     assertEquals(3750, ((BooleanColumnStatistics) stats[1]).getTrueCount());
-    assertEquals("count: 7500 hasNull: true bytesOnDisk: 0 true: 3750", stats[1].toString());
+    assertEquals("count: 7500 hasNull: true true: 3750", stats[1].toString());
 
     assertEquals(2048, ((IntegerColumnStatistics) stats[3]).getMaximum());
     assertEquals(1024, ((IntegerColumnStatistics) stats[3]).getMinimum());
     assertEquals(true, ((IntegerColumnStatistics) stats[3]).isSumDefined());
     assertEquals(11520000, ((IntegerColumnStatistics) stats[3]).getSum());
-    assertEquals("count: 7500 hasNull: true bytesOnDisk: 0 min: 1024 max: 2048 sum: 11520000",
+    assertEquals("count: 7500 hasNull: true min: 1024 max: 2048 sum: 11520000",
         stats[3].toString());
 
     assertEquals(Long.MAX_VALUE,
@@ -226,17 +226,17 @@ public class TestVectorOrcFile {
         ((IntegerColumnStatistics) stats[5]).getMinimum());
     assertEquals(false, ((IntegerColumnStatistics) stats[5]).isSumDefined());
     assertEquals(
-        "count: 7500 hasNull: true bytesOnDisk: 0 min: 9223372036854775807 max: 9223372036854775807",
+        "count: 7500 hasNull: true min: 9223372036854775807 max: 9223372036854775807",
         stats[5].toString());
 
     assertEquals(-15.0, ((DoubleColumnStatistics) stats[7]).getMinimum(), 0.0001);
     assertEquals(-5.0, ((DoubleColumnStatistics) stats[7]).getMaximum(), 0.0001);
     assertEquals(-75000.0, ((DoubleColumnStatistics) stats[7]).getSum(),
         0.00001);
-    assertEquals("count: 7500 hasNull: true bytesOnDisk: 0 min: -15.0 max: -5.0 sum: -75000.0",
+    assertEquals("count: 7500 hasNull: true min: -15.0 max: -5.0 sum: -75000.0",
         stats[7].toString());
 
-    assertEquals("count: 7500 hasNull: true bytesOnDisk: 0 min: bye max: hi sum: 0", stats[9].toString());
+    assertEquals("count: 7500 hasNull: true min: bye max: hi sum: 0", stats[9].toString());
 
     // check the inspectors
     TypeDescription schema = reader.getSchema();
@@ -446,7 +446,7 @@ public class TestVectorOrcFile {
     ColumnStatistics[] stats = reader.getStatistics();
     assertArrayEquals(stats, writer.getStatistics());
     assertEquals(4, stats[0].getNumberOfValues());
-    assertEquals("count: 4 hasNull: false bytesOnDisk: 0", stats[0].toString());
+    assertEquals("count: 4 hasNull: false", stats[0].toString());
 
     assertEquals(3, stats[1].getNumberOfValues());
     assertEquals(15, ((BinaryColumnStatistics) stats[1]).getSum());

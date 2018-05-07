@@ -92,6 +92,7 @@ public class TypeDescriptionPrettyPrint {
       case SHORT:
       case STRING:
       case TIMESTAMP:
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
         break;
 
       case DECIMAL:

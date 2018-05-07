@@ -432,6 +432,7 @@ public class RecordReaderUtils {
       case MAP:
       case LIST:
       case UNION:
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
         return base;
       case CHAR:
       case VARCHAR:

@@ -684,6 +684,7 @@ public class ReaderImpl implements Reader {
       int avgStrLen = (int) (colStat.getStringStatistics().getSum() / numVals);
       return numVals * JavaDataModel.get().lengthForStringOfLength(avgStrLen);
     case TIMESTAMP:
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
       return numVals * JavaDataModel.get().lengthOfTimestamp();
     case DATE:
       return numVals * JavaDataModel.get().lengthOfDate();

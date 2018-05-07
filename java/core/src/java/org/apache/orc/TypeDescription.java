@@ -110,6 +110,7 @@ public class TypeDescription
     STRING("string", true),
     DATE("date", true),
     TIMESTAMP("timestamp", true),
+    TIMESTAMP_WITH_LOCAL_TIME_ZONE("timestamp with local time zone", true),
     BINARY("binary", true),
     DECIMAL("decimal", true),
     VARCHAR("varchar", true),
@@ -174,6 +175,10 @@ public class TypeDescription
 
   public static TypeDescription createTimestamp() {
     return new TypeDescription(Category.TIMESTAMP);
+  }
+
+  public static TypeDescription createTimestampWithLocalTimeZone() {
+    return new TypeDescription(Category.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
   }
 
   public static TypeDescription createBinary() {
@@ -346,6 +351,7 @@ public class TypeDescription
       case SHORT:
       case STRING:
       case TIMESTAMP:
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
         break;
       case CHAR:
       case VARCHAR:
@@ -636,6 +642,7 @@ public class TypeDescription
       case DATE:
         return new LongColumnVector(maxSize);
       case TIMESTAMP:
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
         return new TimestampColumnVector(maxSize);
       case FLOAT:
       case DOUBLE:

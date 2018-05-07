@@ -128,6 +128,9 @@ public class OrcUtils {
     case TIMESTAMP:
       type.setKind(OrcProto.Type.Kind.TIMESTAMP);
       break;
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+      type.setKind(OrcProto.Type.Kind.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+      break;
     case DATE:
       type.setKind(OrcProto.Type.Kind.DATE);
       break;
@@ -226,6 +229,9 @@ public class OrcUtils {
     case TIMESTAMP:
       type.setKind(OrcProto.Type.Kind.TIMESTAMP);
       break;
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+      type.setKind(OrcProto.Type.Kind.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+      break;
     case DATE:
       type.setKind(OrcProto.Type.Kind.DATE);
       break;
@@ -245,7 +251,7 @@ public class OrcUtils {
       {
         // Make room for MAP type.
         result.add(null);
-  
+
         // Add MAP type pair in order to determine their subtype values.
         appendOrcTypesRebuildSubtypes(result, children.get(0));
         int subtype2 = result.size();
@@ -364,6 +370,9 @@ public class OrcUtils {
     case TIMESTAMP:
       builder.setKind(OrcProto.Type.Kind.TIMESTAMP);
       break;
+    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+      builder.setKind(OrcProto.Type.Kind.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+      break;
     case DATE:
       builder.setKind(OrcProto.Type.Kind.DATE);
       break;
@@ -383,7 +392,7 @@ public class OrcUtils {
       {
         // Make room for MAP type.
         result.add(null);
-  
+
         // Add MAP type pair in order to determine their subtype values.
         columnId = appendOrcTypesRebuildSubtypes(result, types, columnId);
         int subtype2 = result.size();
@@ -491,6 +500,8 @@ public class OrcUtils {
         return TypeDescription.createBinary();
       case TIMESTAMP:
         return TypeDescription.createTimestamp();
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+        return TypeDescription.createTimestampWithLocalTimeZone();
       case DATE:
         return TypeDescription.createDate();
       case DECIMAL: {

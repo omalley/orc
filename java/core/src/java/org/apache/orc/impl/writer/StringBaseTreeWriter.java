@@ -80,10 +80,11 @@ public abstract class StringBaseTreeWriter extends TreeWriterBase {
         OrcConf.DICTIONARY_KEY_SIZE_THRESHOLD.getDouble(conf);
     strideDictionaryCheck =
         OrcConf.ROW_INDEX_STRIDE_DICTIONARY_CHECK.getBoolean(conf);
-    doneDictionaryCheck = false;
     if (dictionaryKeySizeThreshold <= 0.0) {
       useDictionaryEncoding = false;
       doneDictionaryCheck = true;
+    } else {
+      doneDictionaryCheck = false;
     }
   }
 

@@ -40,9 +40,10 @@
     <hadoop.version>2.7.3</hadoop.version>
     <hive.version>2.3.3</hive.version>
     <jmh.version>1.20</jmh.version>
-    <orc.version>1.6.0-SNAPSHOT</orc.version>
-    <parquet.version>1.9.0</parquet.version>
-    <storage-api.version>2.5.0</storage-api.version>
+    <orc.version>1.5.1</orc.version>
+    <parquet.version>1.8.2</parquet.version>
+    <spark.version>2.3.0</spark.version>
+    <storage-api.version>2.6.1</storage-api.version>
     <zookeeper.version>3.4.6</zookeeper.version>
   </properties>
 
@@ -73,6 +74,18 @@
         </exclusion>
       </exclusions>
     </dependency>
+   <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-all</artifactId>
+      <version>4.1.17.Final</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty</artifactId>
+      <version>3.9.9.Final</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
@@ -90,13 +103,30 @@
       <version>1.4</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.7</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
+      <version>${hadoop.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-yarn-common</artifactId>
       <version>${hadoop.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -118,6 +148,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
+      <artifactId>hive-service-rpc</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
       <artifactId>hive-storage-api</artifactId>
       <version>${storage-api.version}</version>
     </dependency>
@@ -127,9 +162,47 @@
       <version>${orc.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.orc</groupId>
+      <artifactId>orc-mapreduce</artifactId>
+      <version>${orc.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-hadoop-bundle</artifactId>
       <version>${parquet.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-catalyst_2.11</artifactId>
+      <version>${spark.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
+      <version>${spark.version}</version>
+      <exclusions>
+	<exclusion>
+	  <groupId>org.apache.orc</groupId>
+	  <artifactId>orc-core</artifactId>
+	</exclusion>
+	<exclusion>
+	  <groupId>org.apache.orc</groupId>
+	  <artifactId>orc-mapreduce</artifactId>
+	</exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+      <version>3.0.8</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>commons-compiler</artifactId>
+      <version>3.0.8</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.jodd</groupId>
@@ -188,24 +261,58 @@
         </configuration>
       </plugin>
       <plugin>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-              <mainClass>org.apache.orc.bench.Driver</mainClass>
-            </manifest>
-          </archive>
-	  <descriptors>
-            <descriptor>src/assembly/uber.xml</descriptor>
-          </descriptors>
-        </configuration>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.1.1</version>
         <executions>
           <execution>
-            <id>make-assembly</id> <!-- this is used for inheritance merges -->
-            <phase>package</phase> <!-- bind to the packaging phase -->
+            <phase>package</phase>
             <goals>
-              <goal>single</goal>
+              <goal>shade</goal>
             </goals>
+            <configuration>
+              <filters>
+               <filter>
+                 <artifact>org.eclipse.jetty.orbit:javax.servlet</artifact>
+                 <excludes>
+                   <exclude>META-INF/ECLIPSEF.RSA</exclude>
+                   <exclude>META-INF/ECLIPSEF.SF</exclude>
+                   <exclude>META-INF/eclipse.inf</exclude>
+                 </excludes>
+               </filter>
+               <filter>
+                 <artifact>org.codehaus.janino:janino</artifact>
+                 <excludes>
+                   <exclude>META-INF/DUMMY.SF</exclude>
+                   <exclude>META-INF/DUMMY.DSA</exclude>
+                 </excludes>
+               </filter>
+               <filter>
+                 <artifact>org.codehaus.janino:commons-compiler</artifact>
+                 <excludes>
+                   <exclude>META-INF/DUMMY.SF</exclude>
+                   <exclude>META-INF/DUMMY.DSA</exclude>
+                 </excludes>
+               </filter>
+              </filters>
+	      <relocations>
+		<relocation>
+		  <pattern>org.apache.orc.storage</pattern>
+		  <shadedPattern>org.apache.hadoop.hive</shadedPattern>
+		</relocation>
+	      </relocations>
+              <transformers>
+                <transformer
+		    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Main-Class>org.apache.orc.bench.Driver</Main-Class>
+                  </manifestEntries>
+                </transformer>
+                <transformer
+		    implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer">
+                </transformer>
+              </transformers>
+            </configuration>
           </execution>
         </executions>
       </plugin>

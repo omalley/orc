@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,10 +19,13 @@ package org.apache.hadoop.fs;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
 
 public class TrackingLocalFileSystem extends RawLocalFileSystem {
+  static final URI NAME = URI.create("track:///");
 
   class TrackingFileInputStream extends RawLocalFileSystem.LocalFSFileInputStream {
+
     public TrackingFileInputStream(Path f) throws IOException {
       super(f);
     }
@@ -49,6 +52,11 @@ public class TrackingLocalFileSystem extends RawLocalFileSystem {
     }
     return new FSDataInputStream(new BufferedFSInputStream(
         new TrackingFileInputStream(f), bufferSize));
+  }
+
+  @Override
+  public URI getUri() {
+    return NAME;
   }
 
   public FileSystem.Statistics getLocalStatistics() {

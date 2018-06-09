@@ -23,7 +23,6 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.orc.bench.convert.GenerateVariants;
 import org.apache.orc.bench.convert.ScanVariants;
 
@@ -48,6 +47,7 @@ public class Driver {
       System.err.println("  read-all  - Full table scan benchmark");
       System.err.println("  read-some - Column projection benchmark");
       System.err.println("  decimal   - Decimal benchmark");
+      System.err.println("  spark     - Spark read benchmarks");
       System.exit(1);
     }
     return result;
@@ -73,6 +73,9 @@ public class Driver {
         break;
       case "decimal":
         DecimalBench.main(args);
+        break;
+      case "spark":
+        SparkBenchmark.main(args);
         break;
       default:
         System.err.println("Unknown command " + command);

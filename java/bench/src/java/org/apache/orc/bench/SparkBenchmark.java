@@ -66,7 +66,6 @@ import scala.collection.JavaConverters;
 import scala.collection.immutable.Map;
 import scala.collection.immutable.Map$;
 import scala.collection.Seq;
-import scala.reflect.internal.TreeGen;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -110,7 +109,9 @@ public class SparkBenchmark {
     @Setup(Level.Trial)
     public void setup() {
       session = SparkSession.builder().appName("benchmark")
-          .config("spark.master", "local[4]").getOrCreate();
+          .config("spark.master", "local[4]")
+          .config("spark.sql.orc.filterPushdown", true)
+          .config("spark.sql.orc.impl", "native").getOrCreate();
       conf = new Configuration();
       conf.set("fs.track.impl", TrackingLocalFileSystem.class.getName());
       path = new Path("track://",

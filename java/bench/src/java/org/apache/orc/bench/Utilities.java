@@ -18,6 +18,9 @@
 
 package org.apache.orc.bench;
 
+import com.netflix.iceberg.Schema;
+import com.netflix.iceberg.types.Type;
+import com.netflix.iceberg.types.Types;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.orc.TypeDescription;
@@ -155,6 +158,63 @@ public class Utilities {
       }
       default:
         throw new IllegalArgumentException("Unhandled type " + schema);
+    }
+  }
+
+  public static Schema toIcebergType(TypeDescription schema) {
+    return new Schema(convertOrcToType(schema).asStructType().fields());
+  }
+
+  static Type convertOrcToType(TypeDescription schema) {
+    TypeDescription key;
+    switch(schema.getCategory()) {
+      case BOOLEAN:
+        return Types.BooleanType.get();
+      case BYTE:
+      case SHORT:
+      case INT:
+        return Types.IntegerType.get();
+      case LONG:
+        return Types.LongType.get();
+      case FLOAT:
+        return Types.FloatType.get();
+      case DOUBLE:
+        return Types.DoubleType.get();
+      case STRING:
+      case CHAR:
+      case VARCHAR:
+        return Types.StringType.get();
+      case BINARY:
+        return Types.BinaryType.get();
+      case DATE:
+        return Types.DateType.get();
+      case TIMESTAMP:
+        return Types.TimestampType.withZone();
+      case DECIMAL:
+        return Types.DecimalType.of(schema.getPrecision(), schema.getScale());
+      case STRUCT:
+        List<String> fieldNames = schema.getFieldNames();
+        List<TypeDescription> fieldTypes = schema.getChildren();
+        List<Types.NestedField> fields = new ArrayList(fieldNames.size());
+
+        for(int c = 0; c < fieldNames.size(); ++c) {
+          String name = (String)fieldNames.get(c);
+          TypeDescription type = (TypeDescription)fieldTypes.get(c);
+          fields.add(Types.NestedField.optional(type.getId(), name,
+              convertOrcToType(type)));
+        }
+
+        return Types.StructType.of(fields);
+      case LIST:
+        key = schema.getChildren().get(0);
+        return Types.ListType.ofOptional(key.getId(), convertOrcToType(key));
+      case MAP:
+        key = schema.getChildren().get(0);
+        TypeDescription value = schema.getChildren().get(1);
+        return Types.MapType.ofOptional(key.getId(), value.getId(),
+            convertOrcToType(key), convertOrcToType(value));
+      default:
+        throw new IllegalArgumentException("Can't handle " + schema);
     }
   }
 }

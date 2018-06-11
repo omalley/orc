@@ -48,6 +48,7 @@ public class Driver {
       System.err.println("  read-some - Column projection benchmark");
       System.err.println("  decimal   - Decimal benchmark");
       System.err.println("  spark     - Spark read benchmarks");
+      System.err.println("  iceberg   - Iceberg read benchmarks");
       System.exit(1);
     }
     return result;
@@ -76,6 +77,9 @@ public class Driver {
         break;
       case "spark":
         SparkBenchmark.main(args);
+        break;
+      case "iceberg":
+        IcebergBenchmark.main(args);
         break;
       default:
         System.err.println("Unknown command " + command);

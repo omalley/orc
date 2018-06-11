@@ -18,6 +18,7 @@
 
 package org.apache.orc.bench;
 
+import com.databricks.spark.avro.DefaultSource;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -111,8 +112,10 @@ public class SparkBenchmark {
       session = SparkSession.builder().appName("benchmark")
           .config("spark.master", "local[4]")
           .config("spark.sql.orc.filterPushdown", true)
-          .config("spark.sql.orc.impl", "native").getOrCreate();
-      conf = new Configuration();
+          .config("spark.sql.orc.impl", "native")
+          .getOrCreate();
+      conf = session.sparkContext().hadoopConfiguration();
+      conf.set("avro.mapred.ignore.inputs.without.extension","false");
       conf.set("fs.track.impl", TrackingLocalFileSystem.class.getName());
       path = new Path("track://",
           Utilities.getVariant(root, dataset, format, compression));
@@ -128,6 +131,9 @@ public class SparkBenchmark {
         throw new IllegalArgumentException("Can't read schema " + dataset, e);
       }
       switch (format) {
+        case "avro":
+          formatObject = new DefaultSource();
+          break;
         case "orc":
           formatObject = new OrcFileFormat();
           break;
@@ -220,8 +226,8 @@ public class SparkBenchmark {
     List<Tuple2<String,String>> options = new ArrayList<>();
     switch (source.format) {
       case "json":
-        options.add(new Tuple2<>("timestampFormat", "yyyy-MM-dd HH:mm:ss.SSS"));
-        break;
+      case "avro":
+        throw new IllegalArgumentException(source.format + " can't handle projection");
       default:
         break;
     }
@@ -293,8 +299,8 @@ public class SparkBenchmark {
     List<Tuple2<String,String>> options = new ArrayList<>();
     switch (source.format) {
       case "json":
-        options.add(new Tuple2<>("timestampFormat", "yyyy-MM-dd HH:mm:ss.SSS"));
-        break;
+      case "avro":
+        throw new IllegalArgumentException(source.format + " can't handle pushdown");
       default:
         break;
     }

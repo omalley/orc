@@ -38,6 +38,7 @@ import org.apache.orc.TypeDescription;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Arrays;
@@ -558,44 +559,16 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
 
     @Override
     public void updateString(Text value) {
-      if (minimum == null) {
-        if(value.getLength() > MAX_BYTES_RECORDED) {
-         minimum = truncateLowerBound(value);
-         maximum = truncateUpperBound(value);
-         isLowerBoundSet = true;
-         isUpperBoundSet = true;
-        } else {
-          maximum = minimum = new Text(value);
-          isLowerBoundSet = isUpperBoundSet = false;
-        }
-      } else if (minimum.compareTo(value) > 0) {
-        if(value.getLength() > MAX_BYTES_RECORDED) {
-          minimum = truncateLowerBound(value);
-          isLowerBoundSet = true;
-        }else {
-          minimum = new Text(value);
-          isLowerBoundSet = false;
-        }
-      } else if (maximum.compareTo(value) < 0) {
-        if(value.getLength() > MAX_BYTES_RECORDED) {
-          maximum = truncateUpperBound(value);
-          isUpperBoundSet = true;
-        } else {
-          maximum = new Text(value);
-          isUpperBoundSet = false;
-        }
-      }
-      sum += value.getLength();
+      updateString(value.getBytes(), 0, value.getLength(), 1);
     }
-
 
     @Override
     public void updateString(byte[] bytes, int offset, int length,
                              int repetitions) {
       if (minimum == null) {
         if(length > MAX_BYTES_RECORDED) {
-          minimum = truncateLowerBound(bytes, offset, length);
-          maximum = truncateUpperBound(bytes, offset, length);
+          minimum = truncateLowerBound(bytes, offset);
+          maximum = truncateUpperBound(bytes, offset);
           isLowerBoundSet = true;
           isUpperBoundSet = true;
         } else {
@@ -607,7 +580,7 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
       } else if (WritableComparator.compareBytes(minimum.getBytes(), 0,
           minimum.getLength(), bytes, offset, length) > 0) {
         if(length > MAX_BYTES_RECORDED) {
-          minimum = truncateLowerBound(bytes, offset, length);
+          minimum = truncateLowerBound(bytes, offset);
           isLowerBoundSet = true;
         } else {
           minimum = new Text();
@@ -617,7 +590,7 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
       } else if (WritableComparator.compareBytes(maximum.getBytes(), 0,
           maximum.getLength(), bytes, offset, length) < 0) {
         if(length > MAX_BYTES_RECORDED) {
-          maximum = truncateUpperBound(bytes, offset, length);
+          maximum = truncateUpperBound(bytes, offset);
           isUpperBoundSet = true;
         } else {
           maximum = new Text();
@@ -747,11 +720,19 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
     @Override
     public String toString() {
       StringBuilder buf = new StringBuilder(super.toString());
-      if (getNumberOfValues() != 0) {
-        buf.append(" min: ");
-        buf.append(getMinimum());
-        buf.append(" max: ");
-        buf.append(getMaximum());
+      if (minimum != null) {
+        if (isLowerBoundSet) {
+          buf.append(" lower: ");
+        } else {
+          buf.append(" min: ");
+        }
+        buf.append(getLowerBound());
+        if (isUpperBoundSet) {
+          buf.append(" upper: ");
+        } else {
+          buf.append(" max: ");
+        }
+        buf.append(getUpperBound());
         buf.append(" sum: ");
         buf.append(sum);
       }
@@ -795,127 +776,91 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
     }
 
     /**
-     * A helper function that truncates the {@link Text} input
-     * based on {@link #MAX_BYTES_RECORDED} and increments
-     * the last codepoint by 1.
-     * @param text
-     * @return truncated Text value
+     * Find the start of the last character that ends in the current string.
+     * @param text the bytes of the utf-8
+     * @param from the first byte location
+     * @param until the last byte location
+     * @return the index of the last character
      */
-    private static Text truncateUpperBound(final Text text) {
-
-      if(text.getBytes().length > MAX_BYTES_RECORDED) {
-        return truncateUpperBound(text.getBytes(), 0, text.getBytes().length);
-      } else {
-        return text;
-      }
-
-    }
-
-    /**
-     * A helper function that truncates the {@link byte[]} input
-     * based on {@link #MAX_BYTES_RECORDED} and increments
-     * the last codepoint by 1.
-     * @param text
-     * @return truncated Text value
-     */
-    private static Text truncateUpperBound(final byte[] text, final int from, final int len) {
-      if(len > MAX_BYTES_RECORDED) {
-        final Text truncated = truncateLowerBound(text, from, len);
-        final byte[] data = truncated.getBytes();
-
-        int lastCharPosition = data.length - 1;
-        int offset = 0;
-
-        /* we don't expect characters more than 5 bytes */
-        for (int i = 0; i < 5; i++) {
-          final byte b = data[lastCharPosition];
-          offset = getCharLength(b);
-
-          /* found beginning of a valid char */
-          if (offset > 0) {
-            final byte[] lastCharBytes = Arrays
-                .copyOfRange(text, from + lastCharPosition, lastCharPosition + offset);
-            /* last character */
-            final String s = new String(lastCharBytes, Charset.forName("UTF-8"));
-
-            /* increment the codepoint of last character */
-            int codePoint = s.codePointAt(s.length() - 1);
-            codePoint++;
-            final char[] incrementedChars = Character.toChars(codePoint);
-
-            /* convert char array to byte array */
-            final CharBuffer charBuffer = CharBuffer.wrap(incrementedChars);
-            final ByteBuffer byteBuffer = Charset.forName("UTF-8").encode(charBuffer);
-            final byte[] bytes = Arrays.copyOfRange(byteBuffer.array(), byteBuffer.position(),
-                byteBuffer.limit());
-
-            final Text textResult = new Text();
-            /* copy truncated array minus last char */
-            textResult.set(text, from, lastCharPosition);
-            /* copy last char */
-            textResult.append(bytes, 0, bytes.length);
-            return textResult;
-
-          } /* not found keep looking for a beginning byte */ else {
-            --lastCharPosition;
-          }
-
+    private static int findLastCharacter(byte[] text, int from, int until) {
+      int posn = until;
+      /* we don't expect characters more than 5 bytes */
+      while (posn >= from) {
+        if (getCharLength(text[posn]) > 0) {
+          return posn;
         }
-        /* beginning of a valid char not found */
-        throw new IllegalArgumentException(
-            "Could not truncate string, beginning of a valid char not found");
-      } else {
-        return new Text(text);
+        posn -= 1;
       }
+      /* beginning of a valid char not found */
+      throw new IllegalArgumentException(
+          "Could not truncate string, beginning of a valid char not found");
     }
 
-    private static Text truncateLowerBound(final Text text) {
-      if(text.getBytes().length > MAX_BYTES_RECORDED) {
-        return truncateLowerBound(text.getBytes(), 0, text.getBytes().length);
+    private static int getCodePoint(byte[] source, int from, int len) {
+      return new String(source, from, len, StandardCharsets.UTF_8)
+          .codePointAt(0);
+    }
+
+    private static void appendCodePoint(Text result, int codepoint) {
+      if (codepoint < 0 || codepoint > 0x1f_ffff) {
+        throw new IllegalArgumentException("Codepoint out of range " +
+            codepoint);
+      }
+      byte[] buffer = new byte[4];
+      if (codepoint < 0x7f) {
+        buffer[0] = (byte) codepoint;
+        result.append(buffer, 0, 1);
+      } else if (codepoint <= 0x7ff) {
+        buffer[0] = (byte) (0xc0 | (codepoint >> 6));
+        buffer[1] = (byte) (0x80 | (codepoint & 0x3f));
+        result.append(buffer, 0 , 2);
+      } else if (codepoint < 0xffff) {
+        buffer[0] = (byte) (0xe0 | (codepoint >> 12));
+        buffer[1] = (byte) (0x80 | ((codepoint >> 6) & 0x3f));
+        buffer[2] = (byte) (0x80 | (codepoint & 0x3f));
+        result.append(buffer, 0, 3);
       } else {
-        return text;
+        buffer[0] = (byte) (0xf0 | (codepoint >> 18));
+        buffer[1] = (byte) (0x80 | ((codepoint >> 12) & 0x3f));
+        buffer[2] = (byte) (0x80 | ((codepoint >> 6) & 0x3f));
+        buffer[3] = (byte) (0x80 | (codepoint & 0x3f));
+        result.append(buffer, 0, 4);
       }
     }
 
     /**
-     *
+     * Create a text that is truncated to at most MAX_BYTES_RECORDED at a
+     * character boundary with the last code point incremented by 1.
+     * The length is assumed to be greater than MAX_BYTES_RECORDED.
+     * @param text the text to truncate
+     * @param from the index of the first character
+     * @return truncated Text value
+     */
+    private static Text truncateUpperBound(final byte[] text, final int from) {
+      int followingChar = findLastCharacter(text, from,
+          from + MAX_BYTES_RECORDED);
+      int lastChar = findLastCharacter(text, from, followingChar - 1);
+      Text result = new Text();
+      result.set(text, from, lastChar - from);
+      appendCodePoint(result,
+          getCodePoint(text, lastChar, followingChar - lastChar) + 1);
+      return result;
+    }
+
+    /**
+     * Create a text that is truncated to at most MAX_BYTES_RECORDED at a
+     * character boundary.
+     * The length is assumed to be greater than MAX_BYTES_RECORDED.
      * @param text Byte array to truncate
-     * @param from This is the initial index to be copied, inclusive.
-     * @param len length of the data.
+     * @param from This is the index of the first character
      * @return truncated {@link Text}
      */
-    private static Text truncateLowerBound(final byte[] text, final int from, final int len) {
+    private static Text truncateLowerBound(final byte[] text, final int from) {
 
-      if(len > MAX_BYTES_RECORDED) {
-
-        int truncateLen = MAX_BYTES_RECORDED;
-        int offset = 0;
-
-        for(int i=0; i<5; i++) {
-
-          byte b = text[from + truncateLen];
-          /* check for the beginning of 1,2,3,4,5 bytes long char */
-          offset = getCharLength(b);
-
-          /* found beginning of a valid char */
-          if(offset > 0) {
-            final Text result = new Text();
-            result.set(text, from, truncateLen);
-            return result;
-          } else {
-            /* beginning of a valid char not found decrease the
-            length of array by 1 and loop */
-            --truncateLen;
-          }
-
-        }
-        /* beginning of a valid char not found */
-        throw new IllegalArgumentException("Could not truncate string, beginning of a valid char not found");
-
-      } else {
-        return new Text(Arrays.copyOfRange(text, from, from + len));
-      }
-
+      int lastChar = findLastCharacter(text, from, from + MAX_BYTES_RECORDED);
+      Text result = new Text();
+      result.set(text, from, lastChar - from);
+      return result;
     }
 
     /**

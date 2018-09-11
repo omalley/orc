@@ -19,6 +19,7 @@
 package org.apache.orc;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,6 +33,7 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -185,6 +187,136 @@ public class TestColumnStatistics {
     assertEquals("jane", typed.getMaximum());
   }
 
+  /**
+   * Test the string truncation with 1 byte characters. The last character
+   * of the truncated string is 0x7f so that it will expand into a 2 byte
+   * utf-8 character.
+   */
+  @Test
+  public void testBoundsAscii() {
+    StringBuilder buffer = new StringBuilder();
+    for(int i=0; i < 256; ++i) {
+      buffer.append("Owe\u007fn");
+    }
+    ColumnStatisticsImpl stats = ColumnStatisticsImpl.create(
+            TypeDescription.createString());
+    stats.increment();
+    stats.updateString(new Text(buffer.toString()));
+    StringColumnStatistics stringStats = (StringColumnStatistics) stats;
+
+    // make sure that the min/max are null
+    assertEquals(null, stringStats.getMinimum());
+    assertEquals(null, stringStats.getMaximum());
+    assertEquals(5 * 256, stringStats.getSum());
+
+    // and that the lower and upper bound are correct
+    assertEquals(buffer.substring(0, 1024), stringStats.getLowerBound());
+    assertEquals("Owe\u0080", stringStats.getUpperBound().substring(1020));
+    assertEquals("count: 1 hasNull: false lower: " + stringStats.getLowerBound()
+            + " upper: " + stringStats.getUpperBound() + " sum: 1280",
+        stringStats.toString());
+
+    // make sure that when we replace the min & max the flags get cleared.
+    stats.increment();
+    stats.updateString(new Text("xxx"));
+    assertEquals("xxx", stringStats.getMaximum());
+    assertEquals("xxx", stringStats.getUpperBound());
+    stats.increment();
+    stats.updateString(new Text("A"));
+    assertEquals("A", stringStats.getMinimum());
+    assertEquals("A", stringStats.getLowerBound());
+    assertEquals("count: 3 hasNull: false min: A max: xxx sum: 1284",
+        stats.toString());
+  }
+
+  /**
+   * Test truncation with 2 byte utf-8 characters.
+   */
+  @Test
+  public void testBoundsTwoByte() {
+    StringBuilder buffer = new StringBuilder();
+    final String PATTERN = "\u0080\u07ff\u0432\u0246\u0123";
+    for(int i=0; i < 256; ++i) {
+      buffer.append(PATTERN);
+    }
+    ColumnStatisticsImpl stats = ColumnStatisticsImpl.create(
+        TypeDescription.createString());
+    stats.increment();
+    stats.updateString(new Text(buffer.toString()));
+    StringColumnStatistics stringStats = (StringColumnStatistics) stats;
+
+    // make sure that the min/max are null
+    assertEquals(null, stringStats.getMinimum());
+    assertEquals(null, stringStats.getMaximum());
+    assertEquals(2 * 5 * 256, stringStats.getSum());
+
+    // and that the lower and upper bound are correct
+    // 512 two byte characters fit in 1024 bytes
+    assertEquals(buffer.substring(0, 512), stringStats.getLowerBound());
+    assertEquals(buffer.substring(0, 511),
+        stringStats.getUpperBound().substring(0, 511));
+    assertEquals("\u0800", stringStats.getUpperBound().substring(511));
+  }
+
+  /**
+   * Test truncation with 3 byte utf-8 characters.
+   */
+  @Test
+  public void testBoundsThreeByte() {
+    StringBuilder buffer = new StringBuilder();
+    final String PATTERN = "\uffff\u0800\u4321\u1234\u3137";
+    for(int i=0; i < 256; ++i) {
+      buffer.append(PATTERN);
+    }
+    ColumnStatisticsImpl stats = ColumnStatisticsImpl.create(
+        TypeDescription.createString());
+    stats.increment();
+    stats.updateString(new Text(buffer.toString()));
+    StringColumnStatistics stringStats = (StringColumnStatistics) stats;
+
+    // make sure that the min/max are null
+    assertEquals(null, stringStats.getMinimum());
+    assertEquals(null, stringStats.getMaximum());
+    assertEquals(3 * 5 * 256, stringStats.getSum());
+
+    // and that the lower and upper bound are correct
+    // 341 three byte characters fit in 1024 bytes
+    assertEquals(buffer.substring(0, 341), stringStats.getLowerBound());
+    assertEquals(buffer.substring(0, 340),
+        stringStats.getUpperBound().substring(0,340));
+    assertEquals("\ud800\udc00", stringStats.getUpperBound().substring(340));
+  }
+
+  /**
+   * Test truncation with 4 byte utf-8 characters.
+   */
+  @Test
+  public void testBoundsFourByte() {
+    StringBuilder buffer = new StringBuilder();
+    final String PATTERN = "\ud800\udc00\ud801\udc01\ud802\udc02\ud803\udc03\ud804\udc04";
+    for(int i=0; i < 256; ++i) {
+      buffer.append(PATTERN);
+    }
+    ColumnStatisticsImpl stats = ColumnStatisticsImpl.create(
+        TypeDescription.createString());
+    stats.increment();
+    stats.updateString(new Text(buffer.toString()));
+    StringColumnStatistics stringStats = (StringColumnStatistics) stats;
+
+    // make sure that the min/max are null
+    assertEquals(null, stringStats.getMinimum());
+    assertEquals(null, stringStats.getMaximum());
+    assertEquals(4 * 5 * 256, stringStats.getSum());
+
+    // and that the lower and upper bound are correct
+    // 256 four byte characters fit in 1024 bytes
+    assertEquals(buffer.substring(0, 512), stringStats.getLowerBound());
+    assertEquals(buffer.substring(0, 510),
+        stringStats.getUpperBound().substring(0, 510));
+    assertEquals("\\uD800\\uDC01",
+        StringEscapeUtils.escapeJava(stringStats.getUpperBound().substring(510)));
+  }
+
   @Test
   public void testUpperBoundCodepointIncrement() {
     /* test with characters that use more than one byte */
@@ -212,13 +344,13 @@ public class TestColumnStatistics {
 
     final TypeDescription schema = TypeDescription.createString();
     final ColumnStatisticsImpl stats1 = ColumnStatisticsImpl.create(schema);
-
-    stats1.updateString(input.getBytes(), 0, input.getBytes().length, 1);
+    byte[] utf8 = input.getBytes(StandardCharsets.UTF_8);
+    stats1.updateString(utf8, 0, utf8.length, 1);
 
     final StringColumnStatistics typed = (StringColumnStatistics) stats1;
 
-    assertEquals(1022, typed.getUpperBound().getBytes().length);
-    assertEquals(1022, typed.getLowerBound().getBytes().length);
+    assertEquals(354, typed.getUpperBound().length());
+    assertEquals(354, typed.getLowerBound().length());
 
     assertEquals(upperbound, typed.getUpperBound());
     assertEquals(lowerBound, typed.getLowerBound());

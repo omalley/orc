@@ -1122,12 +1122,12 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
       StringBuilder buf = new StringBuilder(super.toString());
       if (getNumberOfValues() != 0) {
         buf.append(" min: ");
-        buf.append(minimum);
+        buf.append(getMinimum());
         buf.append(" max: ");
-        buf.append(maximum);
+        buf.append(getMaximum());
         if (hasSum) {
           buf.append(" sum: ");
-          buf.append(sum);
+          buf.append(getSum());
         }
       }
       return buf.toString();
@@ -1327,7 +1327,7 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
     }
   }
 
-  private static final class TimestampStatisticsImpl extends ColumnStatisticsImpl
+  private static class TimestampStatisticsImpl extends ColumnStatisticsImpl
       implements TimestampColumnStatistics {
     private Long minimum = null;
     private Long maximum = null;
@@ -1486,7 +1486,31 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
     }
   }
 
-  private long count = 0;
+  private static final class TimestampInstantStatisticsImpl extends TimestampStatisticsImpl {
+    TimestampInstantStatisticsImpl() {
+    }
+
+    TimestampInstantStatisticsImpl(OrcProto.ColumnStatistics stats) {
+      super(stats);
+    }
+
+    @Override
+    public void updateTimestamp(Timestamp value) {
+      updateTimestamp(value.getTime());
+    }
+
+    @Override
+    public Timestamp getMinimum() {
+      return getMinimumUTC();
+    }
+
+    @Override
+    public Timestamp getMaximum() {
+      return getMaximumUTC();
+    }
+  }
+
+  protected long count = 0;
   private boolean hasNull = false;
   private long bytesOnDisk = 0;
 
@@ -1656,6 +1680,8 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
         return new DateStatisticsImpl();
       case TIMESTAMP:
         return new TimestampStatisticsImpl();
+      case TIMESTAMP_INSTANT:
+        return new TimestampInstantStatisticsImpl();
       case BINARY:
         return new BinaryStatisticsImpl();
       default:
@@ -1683,7 +1709,10 @@ public class ColumnStatisticsImpl implements ColumnStatistics {
     } else if (stats.hasDateStatistics()) {
       return new DateStatisticsImpl(stats);
     } else if (stats.hasTimestampStatistics()) {
-      return new TimestampStatisticsImpl(stats);
+      return schema == null ||
+                 schema.getCategory() == TypeDescription.Category.TIMESTAMP ?
+                 new TimestampStatisticsImpl(stats) :
+                 new TimestampInstantStatisticsImpl(stats);
     } else if(stats.hasBinaryStatistics()) {
       return new BinaryStatisticsImpl(stats);
     } else {

@@ -35,6 +35,7 @@ import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.UnionColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 import org.apache.orc.RecordReader;
 import org.apache.orc.TypeDescription;
@@ -223,8 +224,8 @@ public class PrintData {
   }
 
 
-  static void main(Configuration conf, String[] args
-                   ) throws IOException, JSONException, ParseException {
+  static void main(OrcFile.ReaderOptions options, String[] args
+  ) throws IOException, JSONException, ParseException {
     CommandLine cli = parseCommandLine(args);
     if (cli.hasOption('h') || cli.getArgs().length == 0) {
       System.err.println("usage: java -jar orc-tools-*.jar data [--help] <orc file>*");
@@ -234,7 +235,7 @@ public class PrintData {
       for (String file : cli.getArgs()) {
         try {
           Path path = new Path(file);
-          Reader reader = FileDump.getReader(path, conf, badFiles);
+          Reader reader = FileDump.getReader(path, options, badFiles);
           if (reader == null) {
             continue;
           }
@@ -247,5 +248,10 @@ public class PrintData {
         }
       }
     }
+  }
+
+  static void main(Configuration conf,
+                   String[] args) throws IOException, JSONException, ParseException {
+    main(new OrcFile.ReaderOptions(conf), args);
   }
 }

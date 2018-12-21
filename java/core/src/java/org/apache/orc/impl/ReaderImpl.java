@@ -323,7 +323,8 @@ public class ReaderImpl implements Reader {
     FileMetadata fileMetadata = options.getFileMetadata();
     if (fileMetadata != null) {
       this.compressionKind = fileMetadata.getCompressionKind();
-      this.bufferSize = fileMetadata.getCompressionBufferSize();
+      this.bufferSize = Math.max(fileMetadata.getCompressionBufferSize(),
+          options.getMinimumBufferSize());
       this.metadataSize = fileMetadata.getMetadataSize();
       this.stripeStats = fileMetadata.getStripeStats();
       this.versionList = fileMetadata.getVersionList();
@@ -341,14 +342,15 @@ public class ReaderImpl implements Reader {
     } else {
       OrcTail orcTail = options.getOrcTail();
       if (orcTail == null) {
-        tail = extractFileTail(fs, path, options.getMaxLength());
+        tail = extractFileTail(fs, path, options);
         options.orcTail(tail);
       } else {
         checkOrcVersion(path, orcTail.getPostScript());
         tail = orcTail;
       }
       this.compressionKind = tail.getCompressionKind();
-      this.bufferSize = tail.getCompressionBufferSize();
+      this.bufferSize = Math.max(tail.getCompressionBufferSize(),
+                                 options.getMinimumBufferSize());
       this.metadataSize = tail.getMetadataSize();
       this.versionList = tail.getPostScript().getVersionList();
       this.types = tail.getFooter().getTypesList();
@@ -453,7 +455,7 @@ public class ReaderImpl implements Reader {
   }
 
   protected OrcTail extractFileTail(FileSystem fs, Path path,
-      long maxFileLength) throws IOException {
+      OrcFile.ReaderOptions options) throws IOException {
     ByteBuffer buffer;
     OrcProto.PostScript ps;
     OrcProto.FileTail.Builder fileTailBuilder = OrcProto.FileTail.newBuilder();
@@ -461,6 +463,7 @@ public class ReaderImpl implements Reader {
     try (FSDataInputStream file = fs.open(path)) {
       // figure out the size of the file using the option or filesystem
       long size;
+      long maxFileLength = options.getMaxLength();
       if (maxFileLength == Long.MAX_VALUE) {
         FileStatus fileStatus = fs.getFileStatus(path);
         size = fileStatus.getLen();
@@ -495,7 +498,8 @@ public class ReaderImpl implements Reader {
       ensureOrcFooter(file, path, psLen, buffer);
       int psOffset = readSize - 1 - psLen;
       ps = extractPostScript(buffer, path, psLen, psOffset);
-      bufferSize = (int) ps.getCompressionBlockSize();
+      bufferSize = Math.max((int) ps.getCompressionBlockSize(),
+                            options.getMinimumBufferSize());
       CompressionKind compressionKind = CompressionKind.valueOf(ps.getCompression().name());
       fileTailBuilder.setPostscriptLength(psLen).setPostscript(ps);
 

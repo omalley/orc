@@ -63,7 +63,14 @@ public class JsonFileDump {
   private static final Logger LOG = LoggerFactory.getLogger(JsonFileDump.class);
 
   public static void printJsonMetaData(List<String> files,
-      Configuration conf,
+                                       Configuration conf,
+                                       List<Integer> rowIndexCols, boolean prettyPrint, boolean printTimeZone)
+      throws JSONException, IOException {
+    printJsonMetaData(files, new OrcFile.ReaderOptions(conf), rowIndexCols, prettyPrint, printTimeZone);
+  }
+
+  public static void printJsonMetaData(List<String> files,
+      OrcFile.ReaderOptions options,
       List<Integer> rowIndexCols, boolean prettyPrint, boolean printTimeZone)
       throws JSONException, IOException {
     if (files.isEmpty()) {
@@ -83,7 +90,7 @@ public class JsonFileDump {
         }
         writer.key("fileName").value(filename);
         Path path = new Path(filename);
-        Reader reader = FileDump.getReader(path, conf, null);
+        Reader reader = FileDump.getReader(path, options, null);
         if (reader == null) {
           writer.key("status").value("FAILED");
           continue;
@@ -204,7 +211,7 @@ public class JsonFileDump {
         }
         writer.endArray();
 
-        FileSystem fs = path.getFileSystem(conf);
+        FileSystem fs = path.getFileSystem(options.getConfiguration());
         long fileLen = fs.getContentSummary(path).getLength();
         long paddedBytes = FileDump.getTotalPaddingSize(reader);
         // empty ORC file is ~45 bytes. Assumption here is file length always >0

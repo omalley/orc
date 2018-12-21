@@ -115,6 +115,10 @@ public final class FileDump {
       System.err.println("Error : ORC files are not specified");
       return;
     }
+    OrcFile.ReaderOptions options = new OrcFile.ReaderOptions(conf);
+    if (cli.hasOption("buffer")) {
+      options.forceMinimumBufferSize(Integer.parseInt(cli.getOptionValue("buffer")));
+    }
 
     // if the specified path is directory, iterate through all files and print the file dump
     List<String> filesInPath = new ArrayList<>();
@@ -126,13 +130,13 @@ public final class FileDump {
     if (dumpData) {
       PrintData.main(conf, filesInPath.toArray(new String[filesInPath.size()]));
     } else if (recover && skipDump) {
-      recoverFiles(filesInPath, conf, backupPath);
+      recoverFiles(filesInPath, options, backupPath);
     } else {
       if (jsonFormat) {
         boolean prettyPrint = cli.hasOption('p');
         JsonFileDump.printJsonMetaData(filesInPath, conf, rowIndexCols, prettyPrint, printTimeZone);
       } else {
-        printMetaData(filesInPath, conf, rowIndexCols, printTimeZone, recover, backupPath);
+        printMetaData(filesInPath, options, rowIndexCols, printTimeZone, recover, backupPath);
       }
     }
   }
@@ -163,14 +167,14 @@ public final class FileDump {
    * In all other cases, where the file is readable this method will return a reader object.
    *
    * @param path - file to get reader for
-   * @param conf - configuration object
+   * @param options - reader options for the file
    * @param corruptFiles - fills this list with all possible corrupted files
    * @return - reader for the specified file or null
    * @throws IOException
    */
-  static Reader getReader(final Path path, final Configuration conf,
+  static Reader getReader(final Path path, OrcFile.ReaderOptions options,
       final List<String> corruptFiles) throws IOException {
-    FileSystem fs = path.getFileSystem(conf);
+    FileSystem fs = path.getFileSystem(options.getConfiguration());
     long dataFileLen = fs.getFileStatus(path).getLen();
     System.err.println("Processing data file " + path + " [length: " + dataFileLen + "]");
     Path sideFile = OrcAcidUtils.getSideFile(path);
@@ -219,7 +223,8 @@ public final class FileDump {
       }
 
       try {
-        reader = OrcFile.createReader(path, OrcFile.readerOptions(conf).maxLength(maxLen));
+        reader = OrcFile.createReader(path,
+            new OrcFile.ReaderOptions(options).maxLength(maxLen));
 
         // if data file is larger than last flush length, then additional data could be recovered
         if (dataFileLen > maxLen) {
@@ -238,7 +243,7 @@ public final class FileDump {
         return null;
       }
     } else {
-      reader = OrcFile.createReader(path, OrcFile.readerOptions(conf));
+      reader = OrcFile.createReader(path, options);
     }
 
     return reader;
@@ -265,19 +270,19 @@ public final class FileDump {
     return filesInPath;
   }
 
-  private static void printMetaData(List<String> files, Configuration conf,
+  private static void printMetaData(List<String> files, OrcFile.ReaderOptions options,
       List<Integer> rowIndexCols, boolean printTimeZone, final boolean recover,
       final String backupPath)
       throws IOException {
     List<String> corruptFiles = new ArrayList<>();
     for (String filename : files) {
-      printMetaDataImpl(filename, conf, rowIndexCols, printTimeZone, corruptFiles);
+      printMetaDataImpl(filename, options, rowIndexCols, printTimeZone, corruptFiles);
       System.out.println(SEPARATOR);
     }
 
     if (!corruptFiles.isEmpty()) {
       if (recover) {
-        recoverFiles(corruptFiles, conf, backupPath);
+        recoverFiles(corruptFiles, options, backupPath);
       } else {
         System.err.println(corruptFiles.size() + " file(s) are corrupted." +
             " Run the following command to recover corrupted files.\n");
@@ -294,10 +299,10 @@ public final class FileDump {
   }
 
   private static void printMetaDataImpl(final String filename,
-      final Configuration conf, List<Integer> rowIndexCols, final boolean printTimeZone,
+      OrcFile.ReaderOptions options, List<Integer> rowIndexCols, final boolean printTimeZone,
       final List<String> corruptFiles) throws IOException {
     Path file = new Path(filename);
-    Reader reader = getReader(file, conf, corruptFiles);
+    Reader reader = getReader(file, options, corruptFiles);
     // if we can create reader then footer is not corrupt and file will readable
     if (reader == null) {
       return;
@@ -397,7 +402,7 @@ public final class FileDump {
       }
     }
 
-    FileSystem fs = file.getFileSystem(conf);
+    FileSystem fs = file.getFileSystem(options.getConfiguration());
     long fileLen = fs.getFileStatus(file).getLen();
     long paddedBytes = getTotalPaddingSize(reader);
     // empty ORC file is ~45 bytes. Assumption here is file length always >0
@@ -419,13 +424,13 @@ public final class FileDump {
     rows.close();
   }
 
-  private static void recoverFiles(final List<String> corruptFiles, final Configuration conf,
-      final String backup)
-      throws IOException {
+  private static void recoverFiles(final List<String> corruptFiles,
+                                   OrcFile.ReaderOptions options,
+                                   final String backup) throws IOException {
     for (String corruptFile : corruptFiles) {
       System.err.println("Recovering file " + corruptFile);
       Path corruptPath = new Path(corruptFile);
-      FileSystem fs = corruptPath.getFileSystem(conf);
+      FileSystem fs = corruptPath.getFileSystem(options.getConfiguration());
       FSDataInputStream fdis = fs.open(corruptPath);
       try {
         long corruptFileLen = fs.getFileStatus(corruptPath).getLen();
@@ -447,7 +452,8 @@ public final class FileDump {
             index = indexOf(data, magicBytes, index + 1);
             if (index != -1) {
               nextFooterOffset = startPos + index + magicBytes.length + 1;
-              if (isReadable(corruptPath, conf, nextFooterOffset)) {
+              if (isReadable(corruptPath,
+                  new OrcFile.ReaderOptions(options).maxLength(nextFooterOffset))) {
                 footerOffsets.add(nextFooterOffset);
               }
             }
@@ -459,7 +465,7 @@ public final class FileDump {
         }
 
         System.err.println("Readable footerOffsets: " + footerOffsets);
-        recoverFile(corruptPath, fs, conf, footerOffsets, backup);
+        recoverFile(corruptPath, options, footerOffsets, backup);
       } catch (Exception e) {
         Path recoveryFile = getRecoveryFile(corruptPath);
         if (fs.exists(recoveryFile)) {
@@ -477,14 +483,20 @@ public final class FileDump {
     }
   }
 
-  private static void recoverFile(final Path corruptPath, final FileSystem fs,
-      final Configuration conf, final List<Long> footerOffsets, final String backup)
+  private static void recoverFile(final Path corruptPath,
+                                  OrcFile.ReaderOptions options,
+                                  final List<Long> footerOffsets,
+                                  final String backup)
       throws IOException {
 
     // first recover the file to .recovered file and then once successful rename it to actual file
     Path recoveredPath = getRecoveryFile(corruptPath);
 
     // make sure that file does not exist
+    FileSystem fs = options.getFilesystem();
+    if (fs == null) {
+      fs = corruptPath.getFileSystem(options.getConfiguration());
+    }
     if (fs.exists(recoveredPath)) {
       fs.delete(recoveredPath, false);
     }
@@ -494,14 +506,14 @@ public final class FileDump {
       System.err.println("No readable footers found. Creating empty orc file.");
       TypeDescription schema = TypeDescription.createStruct();
       Writer writer = OrcFile.createWriter(recoveredPath,
-          OrcFile.writerOptions(conf).setSchema(schema));
+          OrcFile.writerOptions(options.getConfiguration()).setSchema(schema));
       writer.close();
     } else {
       FSDataInputStream fdis = fs.open(corruptPath);
       FileStatus fileStatus = fs.getFileStatus(corruptPath);
       // read corrupt file and copy it to recovered file until last valid footer
       FSDataOutputStream fdos = fs.create(recoveredPath, true,
-          conf.getInt("io.file.buffer.size", 4096),
+          options.getConfiguration().getInt("io.file.buffer.size", 4096),
           fileStatus.getReplication(),
           fileStatus.getBlockSize());
       try {
@@ -528,7 +540,8 @@ public final class FileDump {
     }
 
     // validate the recovered file once again and start moving corrupt files to backup folder
-    if (isReadable(recoveredPath, conf, Long.MAX_VALUE)) {
+    if (isReadable(recoveredPath,
+        new OrcFile.ReaderOptions(options).maxLength(Long.MAX_VALUE))) {
       Path backupDataPath;
       String scheme = corruptPath.toUri().getScheme();
       String authority = corruptPath.toUri().getAuthority();
@@ -583,10 +596,9 @@ public final class FileDump {
     return new Path(corruptPath.getParent(), corruptPath.getName() + ".recovered");
   }
 
-  private static boolean isReadable(final Path corruptPath, final Configuration conf,
-      final long maxLen) {
+  private static boolean isReadable(final Path corruptPath, OrcFile.ReaderOptions options) {
     try {
-      OrcFile.createReader(corruptPath, OrcFile.readerOptions(conf).maxLength(maxLen));
+      OrcFile.createReader(corruptPath, options);
       return true;
     } catch (Exception e) {
       // ignore this exception as maxLen is unreadable
@@ -764,6 +776,12 @@ public final class FileDump {
     result.addOption(OptionBuilder
         .withLongOpt("backup-path")
         .withDescription("specify a backup path to store the corrupted files (default: /tmp)")
+        .hasArg()
+        .create());
+
+    result.addOption(OptionBuilder
+        .withLongOpt("buffer")
+        .withDescription("override the compression buffer size to deal with corrupted files")
         .hasArg()
         .create());
     return result;

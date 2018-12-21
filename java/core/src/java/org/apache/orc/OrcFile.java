@@ -278,9 +278,20 @@ public class OrcFile {
     // For now keeping this around to avoid complex surgery
     private FileMetadata fileMetadata;
     private boolean useUTCTimestamp;
+    private int minimumBufferSize=0;
 
     public ReaderOptions(Configuration conf) {
       this.conf = conf;
+    }
+
+    public ReaderOptions(ReaderOptions old) {
+      this.conf = old.conf;
+      this.filesystem = old.filesystem;
+      this.maxLength = old.maxLength;
+      this.orcTail = old.orcTail;
+      this.fileMetadata = old.fileMetadata;
+      this.useUTCTimestamp = old.useUTCTimestamp;
+      this.minimumBufferSize = old.minimumBufferSize;
     }
 
     public ReaderOptions filesystem(FileSystem fs) {
@@ -295,6 +306,17 @@ public class OrcFile {
 
     public ReaderOptions orcTail(OrcTail tail) {
       this.orcTail = tail;
+      return this;
+    }
+
+    /**
+     * For corrupted files, provide an option to manually increase the
+     * compression buffer size.
+     * @param size the minimum compression buffer size to use
+     * @return this
+     */
+    public ReaderOptions forceMinimumBufferSize(int size) {
+      minimumBufferSize = size;
       return this;
     }
 
@@ -332,6 +354,9 @@ public class OrcFile {
       return useUTCTimestamp;
     }
 
+    public int getMinimumBufferSize() {
+      return minimumBufferSize;
+    }
   }
 
   public static ReaderOptions readerOptions(Configuration conf) {

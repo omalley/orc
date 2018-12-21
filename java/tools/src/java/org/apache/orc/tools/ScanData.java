@@ -24,6 +24,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 import org.apache.orc.RecordReader;
 import org.codehaus.jettison.json.JSONException;
@@ -53,10 +54,11 @@ public class ScanData {
       System.exit(1);
     } else {
       List<String> badFiles = new ArrayList<>();
+      OrcFile.ReaderOptions options = new OrcFile.ReaderOptions(conf);
       for (String file : cli.getArgs()) {
         try {
           Path path = new Path(file);
-          Reader reader = FileDump.getReader(path, conf, badFiles);
+          Reader reader = FileDump.getReader(path, options, badFiles);
           if (reader == null) {
             continue;
           }

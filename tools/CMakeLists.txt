@@ -10,8 +10,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+cmake_minimum_required (VERSION 2.8.12)
+if (POLICY CMP0042)
+  cmake_policy(SET CMP0042 NEW) # suppress warning about mac rpath
+endif ()
+if (POLICY CMP0068)
+  cmake_policy(SET CMP0068 NEW) # rpath settings don't change install_name
+endif ()
+
+project(ORC_TOOLS C CXX)
+
+option(BUILD_CPP_TESTS
+    "Build the googletest unit tests"
+    ON)
+
+option(TEST_VALGRIND_MEMCHECK
+    "Run the test suite using valgrind --tool=memcheck"
+    OFF)
+
+option(BUILD_SHARED_LIBS
+    "Should we build shared libraries instead of static ones?"
+    ON)
+
+INCLUDE(SetBuildType)
+INCLUDE(SetCompilerOptions)
+
+find_package(Protobuf REQUIRED)
+find_package(HDFSPP)
+find_package(ORC REQUIRED)
+find_package(LZ4 REQUIRED)
+find_package(Snappy REQUIRED)
+find_package(Zlib REQUIRED)
+find_package(Zstd REQUIRED)
+
+include_directories (
+  ${PROJECT_SOURCE_DIR}/../c++/src
+  ${PROJECT_BINARY_DIR}/../orc/src
+  ${PROTOBUF_INCLUDE_DIR}
+  )
+
 add_subdirectory(src)
 
 if (BUILD_CPP_TESTS)
+  enable_testing()
+
   add_subdirectory(test)
 endif ()

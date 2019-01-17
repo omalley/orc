@@ -56,9 +56,12 @@ namespace orc {
     virtual bool Next(void** data, int*size) override;
     virtual void BackUp(int count) override;
     virtual google::protobuf::int64 ByteCount() const override;
+
+    #ifdef PROTOBUF_HAS_OUTSTREAM_ALIASING
     virtual bool WriteAliasedRaw(const void * data, int size) override;
     virtual bool AllowsAliasing() const override;
-
+    #endif
+    
     virtual std::string getName() const;
     virtual uint64_t getSize() const;
     virtual uint64_t flush();

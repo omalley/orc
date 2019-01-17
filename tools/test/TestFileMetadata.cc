@@ -25,7 +25,7 @@
 #include "wrap/gtest-wrapper.h"
 
 TEST (TestFileMetadata, testRaw) {
-  const std::string pgm = findProgram("tools/src/orc-metadata");
+  const std::string pgm = findProgram("orc-metadata");
   const std::string file = findExample("orc_split_elim.orc");
   const std::string expected =
     "Raw file tail: " + file + "\n"
@@ -159,7 +159,7 @@ TEST (TestFileMetadata, testRaw) {
 }
 
 TEST (TestFileMetadata, testJson) {
-  const std::string pgm = findProgram("tools/src/orc-metadata");
+  const std::string pgm = findProgram("orc-metadata");
   const std::string file = findExample("orc_split_elim.orc");
   const std::string expected =
     "{ \"name\": \"" + file + "\",\n"
@@ -208,7 +208,7 @@ TEST (TestFileMetadata, testJson) {
 
 
 TEST (TestFileMetadata, testNoFormat) {
-  const std::string pgm = findProgram("tools/src/orc-metadata");
+  const std::string pgm = findProgram("orc-metadata");
   const std::string file = findExample("orc_no_format.orc");
   const std::string expected =
     "{ \"name\": \"" + file + "\",\n"

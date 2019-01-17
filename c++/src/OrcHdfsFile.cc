@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "hdfspp/hdfspp.h"
+#include "wrap/hdfspp-wrapper.h"
 
 namespace orc {
 

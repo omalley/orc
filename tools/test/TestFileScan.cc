@@ -26,7 +26,7 @@
 #include "wrap/gtest-wrapper.h"
 
 TEST (TestFileScan, testNominal) {
-  const std::string pgm = findProgram("tools/src/orc-scan");
+  const std::string pgm = findProgram("orc-scan");
   const std::string file = findExample("TestOrcFile.testSeek.orc");
   std::string output;
   std::string error;
@@ -96,7 +96,7 @@ TEST (TestFileScan, testRemoveChars) {
 }
 
 TEST (TestFileScan, testBadCommand) {
-  const std::string pgm = findProgram("tools/src/orc-scan");
+  const std::string pgm = findProgram("orc-scan");
   const std::string file = findExample("TestOrcFile.testSeek.orc");
   std::string output;
   std::string error;

@@ -71,6 +71,7 @@ namespace orc {
     return static_cast<google::protobuf::int64>(dataBuffer->size());
   }
 
+  #ifdef PROTOBUF_HAS_OUTSTREAM_ALIASING
   bool BufferedOutputStream::WriteAliasedRaw(const void *, int) {
     throw NotImplementedYet("WriteAliasedRaw is not supported.");
   }
@@ -78,6 +79,7 @@ namespace orc {
   bool BufferedOutputStream::AllowsAliasing() const {
     return false;
   }
+  #endif
 
   std::string BufferedOutputStream::getName() const {
     std::ostringstream result;

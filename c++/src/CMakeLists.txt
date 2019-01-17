@@ -10,7 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS} ${WARN_FLAGS}")
+if (BUILD_SHARED_LIBS AND UNIX)
+  set (CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+  addToRPath(PROTOBUF HDFSPP LZ4 SNAPPY ZLIB ZSTD)
+endif ()
 
 INCLUDE(CheckCXXSourceCompiles)
 
@@ -144,8 +147,6 @@ CHECK_CXX_SOURCE_RUNS("
   HAS_POST_2038
 )
 
-set(CMAKE_REQUIRED_INCLUDES ${ZLIB_INCLUDE_DIR})
-set(CMAKE_REQUIRED_LIBRARIES zlib)
 CHECK_CXX_SOURCE_COMPILES("
     #define Z_PREFIX
     #include<zlib.h>
@@ -156,6 +157,15 @@ CHECK_CXX_SOURCE_COMPILES("
   NEEDS_Z_PREFIX
 )
 
+CHECK_CXX_SOURCE_COMPILES("
+    #include <google/protobuf/io/zero_copy_stream.h>
+    int main(int,char*[]){
+      google::protobuf::io::ZeroCopyOutputStream *foo = NULL;
+      return foo->AllowsAliasing();
+    }"
+  PROTOBUF_HAS_OUTSTREAM_ALIASING
+)
+
 configure_file (
   "Adaptor.hh.in"
   "${CMAKE_CURRENT_BINARY_DIR}/Adaptor.hh"
@@ -164,19 +174,13 @@ configure_file (
 include_directories (
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${PROTOBUF_INCLUDE_DIR}
-  ${ZLIB_INCLUDE_DIR}
-  ${SNAPPY_INCLUDE_DIR}
-  ${LZ4_INCLUDE_DIR}
-  ${LIBHDFSPP_INCLUDE_DIR}
-  ${ZSTD_INCLUDE_DIR}
   )
 
 add_custom_command(OUTPUT orc_proto.pb.h orc_proto.pb.cc
-   COMMAND ${PROTOBUF_EXECUTABLE}
-        -I ${CMAKE_SOURCE_DIR}/proto
+   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+        -I ${CMAKE_SOURCE_DIR}/../proto
         --cpp_out="${CMAKE_CURRENT_BINARY_DIR}"
-        "${CMAKE_SOURCE_DIR}/proto/orc_proto.proto"
+        "${CMAKE_SOURCE_DIR}/../proto/orc_proto.proto"
 )
 
 set(SOURCE_FILES
@@ -210,20 +214,23 @@ set(SOURCE_FILES
   Vector.cc
   Writer.cc)
 
-if(BUILD_LIBHDFSPP)
-  set(SOURCE_FILES ${SOURCE_FILES} OrcHdfsFile.cc)
-  add_definitions(-DBUILD_LIBHDFSPP)
-endif(BUILD_LIBHDFSPP)
-
-add_library (orc STATIC ${SOURCE_FILES})
-
-target_link_libraries (orc
+set (DEPENDENCIES
   protobuf
-  zlib
+  z
   snappy
   lz4
   zstd
-  ${LIBHDFSPP_LIBRARIES}
   )
+
+if (HDFSPP_FOUND)
+  list (APPEND SOURCE_FILES OrcHdfsFile.cc)
+  add_definitions(-DBUILD_LIBHDFSPP)
+  list (APPEND DEPENDENCIES hdfspp)
+endif (HDFSPP_FOUND)
+
+add_library (orc ${LIB_TYPE} ${SOURCE_FILES})
+set_target_properties(orc PROPERTIES VERSION ${ORC_VERSION})
+set_target_properties(orc PROPERTIES SOVERSION ${ORC_MAJOR_MINOR})
+target_link_libraries (orc ${DEPENDENCIES})
 
 install(TARGETS orc DESTINATION lib)

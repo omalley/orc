@@ -25,7 +25,7 @@
 #include "wrap/gtest-wrapper.h"
 
 TEST (TestFileContents, testRaw) {
-  const std::string pgm = findProgram("tools/src/orc-contents");
+  const std::string pgm = findProgram("orc-contents");
   const std::string file = findExample("TestOrcFile.test1.orc");
   const std::string expected =
     "{\"boolean1\": false, \"byte1\": 1, \"short1\": 1024, \"int1\": 65536, "
@@ -53,7 +53,7 @@ TEST (TestFileContents, testRaw) {
 }
 
 TEST (TestFileContents, testSelectedColumns) {
-  const std::string pgm = findProgram("tools/src/orc-contents");
+  const std::string pgm = findProgram("orc-contents");
   const std::string file = findExample("TestOrcFile.test1.orc");
   const std::string options = "--columns=1,3,5,7";
   const std::string expected =

@@ -10,8 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS} ${WARN_FLAGS}")
-
 INCLUDE(CheckCXXSourceCompiles)
 
 CHECK_CXX_SOURCE_COMPILES("
@@ -63,13 +61,4 @@ CHECK_CXX_SOURCE_COMPILES("
     #include <cstdint>
     int main(int, char*[]) { }"
   ORC_CXX_HAS_CSTDINT
-)
-
-CHECK_CXX_SOURCE_COMPILES("
-    #include <thread>
-    int main(void) {
-      thread_local int s;
-      return s;
-    }"
-  ORC_CXX_HAS_THREAD_LOCAL
 )

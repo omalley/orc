@@ -10,18 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_directories(
-  ${PROJECT_SOURCE_DIR}/c++/include
-  ${PROJECT_SOURCE_DIR}/c++/src
-  ${PROJECT_SOURCE_DIR}/tools-c++/src
-  ${PROJECT_BINARY_DIR}/c++/include
-  ${PROJECT_BINARY_DIR}/c++/src
-  ${PROTOBUF_INCLUDE_DIR}
-  ${ZLIB_INCLUDE_DIR}
-  ${GTEST_INCLUDE_DIR}
-)
+find_package(GTest REQUIRED)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS} ${WARN_FLAGS}")
+# Set the rpath so that we find the shared libraries.
+if (BUILD_SHARED_LIBS AND UNIX)
+  set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
+  list(TRANSFORM CMAKE_BUILD_RPATH APPEND "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP ORC LZ4 SNAPPY ZLIB ZSTD)
+endif ()
 
 add_executable (tool-test
   gzip.cc
@@ -37,13 +33,18 @@ add_executable (tool-test
 target_link_libraries (tool-test
   orc
   protobuf
-  zlib
-  snappy
-  ${GTEST_LIBRARIES}
+  z
+  gmock
+  gtest
 )
 
 if (TEST_VALGRIND_MEMCHECK)
-  add_test (tool-test valgrind --tool=memcheck --leak-check=full --error-exitcode=1 ./tool-test ${EXAMPLE_DIRECTORY} ${PROJECT_BINARY_DIR})
+  add_test (tool-test
+    valgrind --tool=memcheck --leak-check=full --error-exitcode=1
+      ./tool-test ${EXAMPLE_DIRECTORY}
+                  ${PROJECT_BINARY_DIR})
 else ()
-  add_test (tool-test tool-test ${EXAMPLE_DIRECTORY} ${PROJECT_BINARY_DIR})
+  add_test (tool-test
+    tool-test ${EXAMPLE_DIRECTORY}
+              ${PROJECT_BINARY_DIR})
 endif ()

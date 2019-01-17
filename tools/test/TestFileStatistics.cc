@@ -25,7 +25,7 @@
 #include "wrap/gtest-wrapper.h"
 
 TEST (TestFileStatistics, testNormal) {
-  const std::string pgm = findProgram("tools/src/orc-statistics");
+  const std::string pgm = findProgram("orc-statistics");
   const std::string file = findExample("orc_index_int_string.orc");
   const std::string expected =
     "File " + file + " has 3 columns\n"
@@ -79,7 +79,7 @@ TEST (TestFileStatistics, testNormal) {
 }
 
 TEST (TestFileStatistics, testOptions) {
-  const std::string pgm = findProgram("tools/src/orc-statistics");
+  const std::string pgm = findProgram("orc-statistics");
   const std::string file = findExample("orc_index_int_string.orc");
   const std::string expected =
     "File " + file + " has 3 columns\n"

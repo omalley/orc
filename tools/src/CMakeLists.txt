@@ -17,30 +17,19 @@
 #   executable can just be removed, as it looks like it was written for testing
 #   alone.
 
-include_directories (
-  ${PROJECT_SOURCE_DIR}/c++/include
-  ${PROJECT_BINARY_DIR}/c++/include
-  ${PROJECT_SOURCE_DIR}/c++/src
-  ${PROJECT_BINARY_DIR}/c++/src
-  ${PROTOBUF_INCLUDE_DIR}
-  )
-
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ${CXX11_FLAGS} ${WARN_FLAGS}")
+if (BUILD_SHARED_LIBS AND UNIX)
+  set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
+  list(TRANSFORM CMAKE_BUILD_RPATH APPEND "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF HDFSPP ORC LZ4 SNAPPY ZLIB ZSTD)
+  addToRPath(CMAKE_INSTALL_RPATH PROTOBUF HDFSPP ORC LZ4 SNAPPY ZLIB ZSTD)
+endif ()
 
 add_executable (orc-contents
   FileContents.cc
   )
 
 target_link_libraries (orc-contents
-  orc
-  ${CMAKE_THREAD_LIBS_INIT}
-  )
-
-add_executable (orc-scan
-  FileScan.cc
-  )
-
-target_link_libraries (orc-scan
   orc
   ${CMAKE_THREAD_LIBS_INIT}
   )
@@ -64,20 +53,26 @@ target_link_libraries (orc-statistics
   ${CMAKE_THREAD_LIBS_INIT}
   )
 
+install(TARGETS
+   orc-contents
+   orc-metadata
+   orc-statistics
+   DESTINATION bin)
+
+add_executable (orc-scan
+  FileScan.cc
+  )
+
+target_link_libraries (orc-scan
+  orc
+  ${CMAKE_THREAD_LIBS_INIT}
+  )
+
 add_executable (orc-memory
   FileMemory.cc
   )
 
 target_link_libraries (orc-memory
-  orc
-  ${CMAKE_THREAD_LIBS_INIT}
-  )
-
-add_executable (timezone-dump
-  TimezoneDump.cc
-  )
-
-target_link_libraries (timezone-dump
   orc
   ${CMAKE_THREAD_LIBS_INIT}
   )
@@ -91,8 +86,3 @@ target_link_libraries (csv-import
   ${CMAKE_THREAD_LIBS_INIT}
   )
 
-install(TARGETS
-   orc-contents
-   orc-metadata
-   orc-statistics
-   DESTINATION bin)

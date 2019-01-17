@@ -200,7 +200,7 @@ std::string findExample(const std::string &name) {
  */
 std::string findProgram(const std::string &name) {
   std::string result = buildDirectory;
-  result += "/";
+  result += "/src/";
   result += name;
   return result;
 }

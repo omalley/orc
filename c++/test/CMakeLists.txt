@@ -10,15 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+find_package(GTest REQUIRED)
+
 include_directories(
-  ${PROJECT_SOURCE_DIR}/c++/src
-  ${PROJECT_BINARY_DIR}/c++/include
-  ${PROJECT_BINARY_DIR}/c++/src
-  ${PROTOBUF_INCLUDE_DIR}
-  ${ZLIB_INCLUDE_DIR}
-  ${SNAPPY_INCLUDE_DIR}
-  ${GTEST_INCLUDE_DIR}
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_BINARY_DIR}/include
+  ${PROJECT_BINARY_DIR}/src
 )
+
+# Set the rpath so that we find the shared libraries.
+if (BUILD_SHARED_LIBS AND UNIX)
+  set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
+  list(TRANSFORM CMAKE_BUILD_RPATH APPEND "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP LZ4 SNAPPY ZLIB)
+endif ()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS} ${WARN_FLAGS}")
 
@@ -53,8 +58,9 @@ target_link_libraries (orc-test
   lz4
   protobuf
   snappy
-  zlib
-  ${GTEST_LIBRARIES}
+  z
+  gmock
+  gtest
 )
 
 add_executable (create-test-files
@@ -68,10 +74,15 @@ target_link_libraries (create-test-files
 
 if (TEST_VALGRIND_MEMCHECK)
   add_test (orc-test
-          valgrind --tool=memcheck --leak-check=full --error-exitcode=1 ./orc-test)
+              valgrind --tool=memcheck --leak-check=full --error-exitcode=1
+              ./orc-test)
 else ()
   add_test (NAME orc-test COMMAND orc-test)
 endif ()
+
+set_property(TEST orc-test PROPERTY
+   ENVIRONMENT "ORC_EXAMPLE_DIR=${EXAMPLE_DIRECTORY}"
+   )
 
 if (WIN32)
   set_property(

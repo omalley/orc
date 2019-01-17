@@ -52,3 +52,16 @@ add_test(
 install(
   FILES ${ORC_JARS}
   DESTINATION share)
+
+# Add another target called test-out that prints the results on failure
+if (CMAKE_CONFIGURATION_TYPES)
+  add_custom_target (test-out
+    COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process
+     --output-on-failure --build-config "$<CONFIGURATION>"
+  )
+else ()
+  add_custom_target (test-out
+    COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process
+       --output-on-failure
+  )
+endif ()

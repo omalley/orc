@@ -26,7 +26,7 @@
 
 TEST (TestCSVFileImport, test10rows) {
   // create an ORC file from importing the CSV file
-  const std::string pgm1 = findProgram("tools/src/csv-import");
+  const std::string pgm1 = findProgram("csv-import");
   const std::string csvFile = findExample("TestCSVFileImport.test10rows.csv");
   const std::string orcFile = "/tmp/test_csv_import_test_10_rows.orc";
   const std::string schema = "struct<_a:bigint,b_:string,c_col:double>";
@@ -37,7 +37,7 @@ TEST (TestCSVFileImport, test10rows) {
   EXPECT_EQ("", error);
 
   // verify the ORC file content
-  const std::string pgm2 = findProgram("tools/src/orc-contents");
+  const std::string pgm2 = findProgram("orc-contents");
   const std::string expected =
     "{\"_a\": 0, \"b_\": \"a\", \"c_col\": 0}\n"
     "{\"_a\": 1, \"b_\": \"b\", \"c_col\": 1.1}\n"

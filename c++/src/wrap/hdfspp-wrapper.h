@@ -12,27 +12,19 @@
  * limitations under the License.
  */
 
-#ifndef ZERO_COPY_STREAM_WRAPPER_HH
-#define ZERO_COPY_STREAM_WRAPPER_HH
+#ifndef HDFSPP_WRAPPER_H
+#define HDFSPP_WRAPPER_H
 
 #include "Adaptor.hh"
 
 DIAGNOSTIC_PUSH
 
-#if defined(__GNUC__) || defined(__clang__)
-  DIAGNOSTIC_IGNORE("-Wdeprecated")
-  DIAGNOSTIC_IGNORE("-Wpadded")
-  DIAGNOSTIC_IGNORE("-Wunused-parameter")
-#endif
-
 #ifdef __clang__
-  DIAGNOSTIC_IGNORE("-Wreserved-id-macro")
-  DIAGNOSTIC_IGNORE("-Wshadow-uncaptured-local")
+  DIAGNOSTIC_IGNORE("-Wextra-semi")
   DIAGNOSTIC_IGNORE("-Wweak-vtables")
-  DIAGNOSTIC_IGNORE("-Wzero-as-null-pointer-constant")
 #endif
 
-#include <google/protobuf/io/zero_copy_stream.h>
+#include <hdfspp/hdfspp.h>
 
 DIAGNOSTIC_POP
 

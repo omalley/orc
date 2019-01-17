@@ -36,6 +36,7 @@ DIAGNOSTIC_PUSH
   DIAGNOSTIC_IGNORE("-Wshift-sign-overflow")
   DIAGNOSTIC_IGNORE("-Wused-but-marked-unused")
   DIAGNOSTIC_IGNORE("-Wweak-vtables")
+  DIAGNOSTIC_IGNORE("-Wzero-as-null-pointer-constant")
 #endif
 
 #include "gmock/gmock.h"

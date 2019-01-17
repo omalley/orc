@@ -30,6 +30,7 @@
   DIAGNOSTIC_IGNORE("-Wmissing-variable-declarations")
   DIAGNOSTIC_IGNORE("-Wnested-anon-types")
   DIAGNOSTIC_IGNORE("-Wreserved-id-macro")
+  DIAGNOSTIC_IGNORE("-Wshadow-uncaptured-local")
   DIAGNOSTIC_IGNORE("-Wshorten-64-to-32")
   DIAGNOSTIC_IGNORE("-Wunknown-warning-option")
   DIAGNOSTIC_IGNORE("-Wweak-vtables")

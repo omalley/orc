@@ -11,6 +11,7 @@
 # limitations under the License.
 
 find_package(GTest REQUIRED)
+find_package(Threads)
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/src

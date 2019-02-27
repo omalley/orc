@@ -10,12 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (BUILD_SHARED_LIBS AND UNIX)
-  set (CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-  include (RpathUtils)
-  addToRPath(CMAKE_INSTALL_RPATH PROTOBUF HDFSPP LZ4 SNAPPY ZLIB ZSTD)
-endif ()
-
 INCLUDE(CheckCXXSourceCompiles)
 
 CHECK_CXX_SOURCE_COMPILES("

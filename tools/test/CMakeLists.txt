@@ -17,7 +17,6 @@ if (BUILD_SHARED_LIBS AND UNIX)
   set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
   include (RpathUtils)
   appendToEach(CMAKE_BUILD_RPATH "/lib")
-  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP LZ4 SNAPPY ZLIB ZSTD)
 endif ()
 
 add_executable (tool-test

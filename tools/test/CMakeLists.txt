@@ -11,6 +11,7 @@
 # limitations under the License.
 
 find_package(GTest REQUIRED)
+find_package(Threads)
 
 # Set the rpath so that we find the shared libraries.
 if (BUILD_SHARED_LIBS AND UNIX)
@@ -36,6 +37,7 @@ target_link_libraries (tool-test
   z
   gmock
   gtest
+  ${CMAKE_THREAD_LIBS_INIT}
 )
 
 if (TEST_VALGRIND_MEMCHECK)

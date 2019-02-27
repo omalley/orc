@@ -5,3 +5,4 @@ debian9
 ubuntu14
 ubuntu16
 ubuntu18
+ubuntu18-bare

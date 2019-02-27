@@ -61,6 +61,7 @@ target_link_libraries (orc-test
   z
   gmock
   gtest
+  ${CMAKE_THREAD_LIBS_INIT}
 )
 
 add_executable (create-test-files
@@ -70,6 +71,7 @@ add_executable (create-test-files
 target_link_libraries (create-test-files
   orc
   protobuf
+  ${CMAKE_THREAD_LIBS_INIT}
 )
 
 if (TEST_VALGRIND_MEMCHECK)

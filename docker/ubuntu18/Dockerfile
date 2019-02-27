@@ -30,10 +30,21 @@ RUN apt-get install -y \
   gcc \
   g++ \
   git \
+  libasio-dev \
+  liblz4-dev \
+  libprotobuf-dev \
+  libprotoc-dev \
+  librapidxml-dev \
+  libsasl2-dev \
+  libsnappy-dev \
+  libssl-dev \
   libtool \
+  libz-dev \
+  libzstd-dev \
   make \
   maven \
   openjdk-8-jdk \
+  protobuf-compiler \
   tzdata
 RUN update-java-alternatives --set java-1.8.0-openjdk-amd64
 

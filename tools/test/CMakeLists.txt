@@ -15,8 +15,9 @@ find_package(GTest REQUIRED)
 # Set the rpath so that we find the shared libraries.
 if (BUILD_SHARED_LIBS AND UNIX)
   set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
-  list(TRANSFORM CMAKE_BUILD_RPATH APPEND "/lib")
-  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP ORC LZ4 SNAPPY ZLIB ZSTD)
+  include (RpathUtils)
+  appendToEach(CMAKE_BUILD_RPATH "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP LZ4 SNAPPY ZLIB ZSTD)
 endif ()
 
 add_executable (tool-test

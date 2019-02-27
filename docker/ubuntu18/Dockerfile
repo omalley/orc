@@ -23,12 +23,14 @@ MAINTAINER Owen O'Malley <owen@hortonworks.com>
 RUN ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
 RUN apt-get update
 RUN apt-get install -y \
+  autoconf \
+  autogen \
+  automake \
   cmake \
   gcc \
   g++ \
   git \
-  libsasl2-dev \
-  libssl-dev \
+  libtool \
   make \
   maven \
   openjdk-8-jdk \

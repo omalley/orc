@@ -20,9 +20,10 @@ include_directories(
 
 # Set the rpath so that we find the shared libraries.
 if (BUILD_SHARED_LIBS AND UNIX)
+  include (RpathUtils)
   set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
-  list(TRANSFORM CMAKE_BUILD_RPATH APPEND "/lib")
-  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP LZ4 SNAPPY ZLIB)
+  appendToEach(CMAKE_BUILD_RPATH "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF GTEST HDFSPP LZ4 SNAPPY ZLIB ZSTD)
 endif ()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS} ${WARN_FLAGS}")

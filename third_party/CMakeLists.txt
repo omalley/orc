@@ -259,7 +259,7 @@ if(BUILD_LIBHDFSPP)
     if (NOT HDFSPP_FOUND)
       set (HDFSPP_CMAKE_ARGS ${THIRDPARTY_CMAKE_OPTIONS})
       list (APPEND HDFSPP_CMAKE_ARGS
-                   -DHDFSPP_LIBRARY_ONLY=TRUE)
+                   -DHDFSPP_LIBRARY_ONLY=ON)
       set(HDFSPP_ROOT
         hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp)
       if (CMAKE_VERSION VERSION_GREATER "3.7")

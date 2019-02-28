@@ -22,15 +22,29 @@ MAINTAINER Owen O'Malley <owen@hortonworks.com>
 
 RUN apt-get update
 RUN apt-get install -y \
+  autoconf \
+  autogen \
+  automake \
   cmake \
   default-jdk \
   gcc \
   g++ \
   git \
+  libasio-dev \
+  liblz4-dev \
+  libprotobuf-dev \
+  libprotoc-dev \
+  librapidxml-dev \
   libsasl2-dev \
+  libsnappy-dev \
   libssl-dev \
+  libtool \
+  liburiparser-dev \
+  libz-dev \
+  libzstd-dev \
   make \
   maven \
+  protobuf-compiler \
   tzdata
 
 WORKDIR /root

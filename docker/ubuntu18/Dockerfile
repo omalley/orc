@@ -39,6 +39,7 @@ RUN apt-get install -y \
   libsnappy-dev \
   libssl-dev \
   libtool \
+  liburiparser-dev \
   libz-dev \
   libzstd-dev \
   make \

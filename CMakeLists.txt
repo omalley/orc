@@ -69,7 +69,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 set(STAGING_DIR "${CMAKE_BINARY_DIR}/staging")
 set_directory_properties(PROPERTIES EP_BASE "${CMAKE_BINARY_DIR}/projects")
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${STAGING_DIR})
-message (STATUS "OOM ORC prefix path = ${CMAKE_PREFIX_PATH}")
 
 INCLUDE(SetBuildType)
 
@@ -115,6 +114,7 @@ ExternalProject_Add (orc
   CMAKE_ARGS ${ORC_CMAKE_ARGS}
   INSTALL_DIR ${STAGING_DIR}
   LIST_SEPARATOR |
+  TEST_BEFORE_INSTALL 1
   TEST_COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process
                                       --output-on-failure
   DEPENDS third_party
@@ -126,6 +126,7 @@ if (BUILD_TOOLS)
     CMAKE_ARGS ${ORC_CMAKE_ARGS}
     INSTALL_DIR ${STAGING_DIR}
     LIST_SEPARATOR |
+    TEST_BEFORE_INSTALL 1
     TEST_COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process
                                         --output-on-failure
     DEPENDS orc

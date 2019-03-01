@@ -91,7 +91,7 @@ find_package(Zlib ${ZLIB_VERSION})
 if (NOT ZLIB_FOUND)
   ExternalProject_Add (zlib_project
     URL "http://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz"
-    CMAKE_ARGS ${THIRDPARTY_CMAKE_ARGS}
+    CMAKE_ARGS ${THIRDPARTY_CMAKE_OPTIONS}
     ${THIRDPARTY_LOG_OPTIONS}
     INSTALL_DIR ${STAGING_DIR}
     LIST_SEPARATOR |

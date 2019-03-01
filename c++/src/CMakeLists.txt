@@ -166,6 +166,14 @@ configure_file (
   "${CMAKE_CURRENT_BINARY_DIR}/Adaptor.hh"
   )
 
+# Set the rpath so that we find the shared libraries.
+if (BUILD_SHARED_LIBS AND UNIX)
+  include (RpathUtils)
+  set(CMAKE_BUILD_RPATH ${CMAKE_PREFIX_PATH})
+  appendToEach(CMAKE_BUILD_RPATH "/lib")
+  addToRPath(CMAKE_BUILD_RPATH PROTOBUF LZ4 SNAPPY ZLIB ZSTD)
+endif ()
+
 include_directories (
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}

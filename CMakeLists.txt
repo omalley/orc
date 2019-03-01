@@ -69,6 +69,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 set(STAGING_DIR "${CMAKE_BINARY_DIR}/staging")
 set_directory_properties(PROPERTIES EP_BASE "${CMAKE_BINARY_DIR}/projects")
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${STAGING_DIR})
+string(REPLACE ";" "|" quoted_prefix_path "${CMAKE_PREFIX_PATH}")
 
 INCLUDE(SetBuildType)
 
@@ -86,8 +87,6 @@ endif ()
 INCLUDE(ExternalProject)
 
 enable_testing()
-
-string(REPLACE ";" "|" quoted_prefix_path "${CMAKE_PREFIX_PATH}")
 
 # Find or build the non-orc c++ libaries
 add_subdirectory(third_party)

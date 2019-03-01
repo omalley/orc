@@ -132,10 +132,10 @@ find_package(LZ4 ${LZ4_VERSION})
 if (NOT LZ4_FOUND)
   if (CMAKE_VERSION VERSION_GREATER "3.7")
     set(LZ4_CONFIGURE SOURCE_SUBDIR "contrib/cmake_unofficial" CMAKE_ARGS
-                      ${THIRDPARTY_CMAKE_ARGS})
+                      ${THIRDPARTY_CMAKE_OPTIONS})
   else()
     set(LZ4_CONFIGURE CONFIGURE_COMMAND "${THIRDPARTY_CONFIGURE_COMMAND}"
-        ${THIRDPARTY_CMAKE_ARGS}
+        ${THIRDPARTY_CMAKE_OPTIONS}
         "${CMAKE_CURRENT_BINARY_DIR}/../projects/Source/lz4_project/contrib/cmake_unofficial")
   endif()
   ExternalProject_Add(lz4_project

@@ -71,7 +71,6 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} UPPERCASE_BUILD_TYPE)
 find_package(Snappy ${SNAPPY_VERSION})
 
 if (NOT SNAPPY_FOUND)
-  message(STATUS "Add snappy project")
   set (SNAPPY_CMAKE_ARGS ${THIRDPARTY_CMAKE_OPTIONS})
   list (APPEND SNAPPY_CMAKE_ARGS -DSNAPPY_BUILD_TESTS=OFF)
   ExternalProject_Add (snappy_project
@@ -90,7 +89,6 @@ endif ()
 find_package(Zlib ${ZLIB_VERSION})
 
 if (NOT ZLIB_FOUND)
-  message(STATUS "Add zlib project")
   ExternalProject_Add (zlib_project
     URL "http://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz"
     CMAKE_ARGS ${THIRDPARTY_CMAKE_ARGS}
@@ -109,14 +107,13 @@ find_package(Zstd ${ZSTD_VERSION})
 if (NOT ZSTD_FOUND)
   if (CMAKE_VERSION VERSION_GREATER "3.7")
     set(ZSTD_CONFIGURE
-        SOURCE_SUBDIR "build/cmake" CMAKE_ARGS ${ZSTD_CMAKE_ARGS})
+        SOURCE_SUBDIR "build/cmake" CMAKE_ARGS ${THIRDPARTY_CMAKE_OPTIONS})
   else()
     set(ZSTD_CONFIGURE
         CONFIGURE_COMMAND "${THIRDPARTY_CONFIGURE_COMMAND}"
-        ${ZSTD_CMAKE_ARGS}
+        ${THIRDPARTY_CMAKE_OPTIONS}
         "${CMAKE_CURRENT_BINARY_DIR}/../projects/Source/zstd_project/build/cmake")
   endif()
-  message(STATUS "Add zstd project")
   ExternalProject_Add(zstd_project
     URL "https://github.com/facebook/zstd/archive/v${ZSTD_VERSION}.tar.gz"
     ${ZSTD_CONFIGURE}
@@ -141,7 +138,6 @@ if (NOT LZ4_FOUND)
         ${THIRDPARTY_CMAKE_ARGS}
         "${CMAKE_CURRENT_BINARY_DIR}/../projects/Source/lz4_project/contrib/cmake_unofficial")
   endif()
-  message(STATUS "Add lz4 project")
   ExternalProject_Add(lz4_project
     URL "https://github.com/lz4/lz4/archive/v${LZ4_VERSION}.tar.gz"
     ${LZ4_CONFIGURE}
@@ -156,7 +152,6 @@ endif ()
 # IANA - Time Zone Database
 
 if (WIN32)
-  message(STATUS "Add tzdata project")
   ExternalProject_Add(tzdata_project
     URL "ftp://cygwin.osuosl.org/pub/cygwin/noarch/release/tzdata/tzdata-2018c-1.tar.xz"
     URL_HASH MD5=F69FCA5C906FAFF02462D3D06F28267C
@@ -220,7 +215,6 @@ if (NOT PROTOBUF_FOUND)
         "${CMAKE_CURRENT_BINARY_DIR}/../projects/Source/protobuf_project/cmake")
   endif()
 
-  message(STATUS "Add protobuf project")
   ExternalProject_Add(protobuf_project
     URL "https://github.com/google/protobuf/archive/v${PROTOBUF_VERSION}.tar.gz"
     ${PROTOBUF_CONFIGURE}

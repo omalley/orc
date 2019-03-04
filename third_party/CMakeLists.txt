@@ -120,6 +120,7 @@ if (NOT ZSTD_FOUND)
     ${THIRDPARTY_LOG_OPTIONS}
     INSTALL_DIR ${STAGING_DIR}
     LIST_SEPARATOR |
+    PATCH_COMMAND patch -u -N -p0 < ${CMAKE_CURRENT_SOURCE_DIR}/gtest.patch
   )
   add_dependencies(third_party_stage1 zstd_project)
 endif ()

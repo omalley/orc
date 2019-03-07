@@ -18,7 +18,7 @@
 #
 
 FROM ubuntu:18.04
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
 RUN apt-get update
@@ -36,9 +36,12 @@ RUN apt-get install -y \
   openjdk-8-jdk \
   tzdata
 RUN update-java-alternatives --set java-1.8.0-openjdk-amd64
+RUN adduser orc << EOF\n\
+orc\norc\n\n\n\n\n\nY\nEOF
 
-WORKDIR /root
-VOLUME /root/.m2/repository
+WORKDIR /home/orc
+VOLUME /home/orc/.m2/repository
+USER orc
 
 CMD git clone https://github.com/apache/orc.git -b master && \
   mkdir orc/build && \

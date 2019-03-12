@@ -18,7 +18,7 @@
 #
 
 FROM ubuntu:18.04
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
 RUN apt-get update
@@ -26,6 +26,7 @@ RUN apt-get install -y \
   autoconf \
   autogen \
   automake \
+  bison \
   cmake \
   gcc \
   g++ \

@@ -18,7 +18,7 @@
 #
 
 FROM ubuntu:14.04
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN apt-get update
 RUN apt-get install -y software-properties-common
@@ -26,6 +26,7 @@ RUN add-apt-repository -y ppa:openjdk-r/ppa
 RUN apt-get update
 RUN apt-get install -y \
   autoconf \
+  bison \
   cmake \
   gcc \
   g++ \

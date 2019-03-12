@@ -26,6 +26,7 @@ RUN apt-get install -y \
   autoconf \
   autogen \
   automake \
+  bison \
   cmake \
   gcc \
   g++ \

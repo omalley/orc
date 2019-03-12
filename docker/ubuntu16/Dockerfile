@@ -18,13 +18,14 @@
 #
 
 FROM ubuntu:16.04
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN apt-get update
 RUN apt-get install -y \
   autoconf \
   autogen \
   automake \
+  bison \
   cmake \
   default-jdk \
   gcc \

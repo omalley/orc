@@ -18,7 +18,7 @@
 #
 
 FROM debian:8
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN echo "deb http://ftp.debian.org/debian jessie-backports main" \
   >> /etc/apt/sources.list
@@ -26,6 +26,7 @@ RUN echo "deb http://ftp.debian.org/debian jessie-backports main" \
 RUN apt-get update
 RUN apt-get install -y \
   autoconf \
+  bison \
   cmake \
   gcc \
   g++ \

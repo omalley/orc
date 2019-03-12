@@ -18,10 +18,11 @@
 #
 
 FROM centos:6
-MAINTAINER Owen O'Malley <owen@hortonworks.com>
+MAINTAINER ORC Dev <dev@orc.apache.org>
 
 RUN yum check-update || true
 RUN yum install -y \
+  bison \
   cmake \
   curl-devel \
   expat-devel \

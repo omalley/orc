@@ -63,6 +63,8 @@ public class ReaderImpl implements Reader {
   private final long maxLength;
   protected final Path path;
   protected final org.apache.orc.CompressionKind compressionKind;
+  protected FSDataInputStream file;
+  protected int fileReferenceCount = 0;
   protected int bufferSize;
   protected OrcProto.Metadata metadata;
   private List<OrcProto.StripeStatistics> stripeStats;
@@ -519,7 +521,9 @@ public class ReaderImpl implements Reader {
     OrcProto.PostScript ps;
     OrcProto.FileTail.Builder fileTailBuilder = OrcProto.FileTail.newBuilder();
     long modificationTime;
-    try (FSDataInputStream file = fs.open(path)) {
+    file = fs.open(path);
+    addFileReference();
+    try {
       // figure out the size of the file using the option or filesystem
       long size;
       if (maxFileLength == Long.MAX_VALUE) {
@@ -536,9 +540,9 @@ public class ReaderImpl implements Reader {
         return buildEmptyTail();
       } else if (size <= OrcFile.MAGIC.length()) {
         // Anything smaller than MAGIC header cannot be valid (valid ORC files
-	// are actually around 40 bytes, this is more conservative)
+        // are actually around 40 bytes, this is more conservative)
         throw new FileFormatException("Not a valid ORC file " + path
-          + " (maxFileLength= " + maxFileLength + ")");
+                                          + " (maxFileLength= " + maxFileLength + ")");
       }
       fileTailBuilder.setFileLength(size);
 
@@ -598,6 +602,14 @@ public class ReaderImpl implements Reader {
         OrcCodecPool.returnCodec(compressionKind, codec);
       }
       fileTailBuilder.setFooter(footer);
+    } catch (Throwable thr) {
+      try {
+        removeFileReference();
+      } catch (IOException ignore) {
+        // ignore
+      }
+      throw thr instanceof IOException ? (IOException) thr :
+                new IOException("Problem reading file footer " + path, thr);
     }
 
     ByteBuffer serializedTail = ByteBuffer.allocate(buffer.remaining());
@@ -822,5 +834,21 @@ public class ReaderImpl implements Reader {
     }
     buffer.append(")");
     return buffer.toString();
+  }
+
+  void addFileReference() {
+    fileReferenceCount += 1;
+  }
+
+  void removeFileReference() throws IOException {
+    fileReferenceCount -= 1;
+    if (fileReferenceCount == 0 && file != null) {
+      file.close();
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    removeFileReference();
   }
 }

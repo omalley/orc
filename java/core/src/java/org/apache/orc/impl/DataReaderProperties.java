@@ -17,6 +17,7 @@
  */
 package org.apache.orc.impl;
 
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.orc.CompressionKind;
@@ -25,6 +26,8 @@ public final class DataReaderProperties {
 
   private final FileSystem fileSystem;
   private final Path path;
+  private final FSDataInputStream file;
+  private final ReaderImpl reader;
   private final CompressionKind compression;
   private final boolean zeroCopy;
   private final int typeCount;
@@ -33,6 +36,8 @@ public final class DataReaderProperties {
   private DataReaderProperties(Builder builder) {
     this.fileSystem = builder.fileSystem;
     this.path = builder.path;
+    this.reader = builder.reader;
+    this.file = builder.file;
     this.compression = builder.compression;
     this.zeroCopy = builder.zeroCopy;
     this.typeCount = builder.typeCount;
@@ -45,6 +50,14 @@ public final class DataReaderProperties {
 
   public Path getPath() {
     return path;
+  }
+
+  public ReaderImpl getReader() {
+    return reader;
+  }
+
+  public FSDataInputStream getFile() {
+    return file;
   }
 
   public CompressionKind getCompression() {
@@ -71,6 +84,8 @@ public final class DataReaderProperties {
 
     private FileSystem fileSystem;
     private Path path;
+    private ReaderImpl reader;
+    private FSDataInputStream file;
     private CompressionKind compression;
     private boolean zeroCopy;
     private int typeCount;
@@ -87,6 +102,12 @@ public final class DataReaderProperties {
 
     public Builder withPath(Path path) {
       this.path = path;
+      return this;
+    }
+
+    public Builder withFile(ReaderImpl reader, FSDataInputStream file) {
+      this.reader = reader;
+      this.file = file;
       return this;
     }
 

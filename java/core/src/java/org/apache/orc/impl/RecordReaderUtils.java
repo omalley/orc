@@ -142,20 +142,24 @@ public class RecordReaderUtils {
   }
 
   private static class DefaultDataReader implements DataReader {
-    private FSDataInputStream file = null;
     private final ByteBufferAllocatorPool pool;
     private HadoopShims.ZeroCopyReaderShim zcr = null;
     private final FileSystem fs;
     private final Path path;
+    private final ReaderImpl reader;
+    private FSDataInputStream file;
     private final boolean useZeroCopy;
     private final CompressionCodec codec;
     private final int bufferSize;
     private final int typeCount;
     private CompressionKind compressionKind;
+    private boolean isOpen = false;
 
     private DefaultDataReader(DataReaderProperties properties) {
       this.fs = properties.getFileSystem();
       this.path = properties.getPath();
+      this.reader = properties.getReader();
+      this.file = properties.getFile();
       this.useZeroCopy = properties.getZeroCopy();
       this.compressionKind = properties.getCompression();
       this.codec = OrcCodecPool.getCodec(compressionKind);
@@ -170,12 +174,17 @@ public class RecordReaderUtils {
 
     @Override
     public void open() throws IOException {
-      this.file = fs.open(path);
+      if (file == null) {
+        this.file = fs.open(path);
+      } else if (reader != null) {
+        reader.addFileReference();
+      }
       if (useZeroCopy) {
         zcr = RecordReaderUtils.createZeroCopyShim(file, codec, pool);
       } else {
         zcr = null;
       }
+      isOpen = true;
     }
 
     @Override
@@ -190,7 +199,7 @@ public class RecordReaderUtils {
                                  OrcProto.Stream.Kind[] bloomFilterKinds,
                                  OrcProto.BloomFilterIndex[] bloomFilterIndices
                                  ) throws IOException {
-      if (file == null) {
+      if (!isOpen) {
         open();
       }
       if (footer == null) {
@@ -258,7 +267,7 @@ public class RecordReaderUtils {
 
     @Override
     public OrcProto.StripeFooter readStripeFooter(StripeInformation stripe) throws IOException {
-      if (file == null) {
+      if (!isOpen) {
         open();
       }
       long offset = stripe.getOffset() + stripe.getIndexLength() + stripe.getDataLength();
@@ -289,7 +298,11 @@ public class RecordReaderUtils {
       // close both zcr and file
       try (HadoopShims.ZeroCopyReaderShim myZcr = zcr) {
         if (file != null) {
-          file.close();
+          if (reader == null) {
+            file.close();
+          } else {
+            reader.removeFileReference();
+          }
         }
       }
     }
@@ -307,6 +320,13 @@ public class RecordReaderUtils {
     @Override
     public DataReader clone() {
       try {
+        if (file != null) {
+          if (reader != null) {
+            reader.addFileReference();
+          } else {
+            throw new IllegalStateException("Can't clone open data reader");
+          }
+        }
         return (DataReader) super.clone();
       } catch (CloneNotSupportedException e) {
         throw new UnsupportedOperationException("uncloneable", e);

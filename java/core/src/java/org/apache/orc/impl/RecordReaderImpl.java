@@ -241,15 +241,19 @@ public class RecordReaderImpl implements RecordReader {
     if (options.getDataReader() != null) {
       this.dataReader = options.getDataReader().clone();
     } else {
-      this.dataReader = RecordReaderUtils.createDefaultDataReader(
+      DataReaderProperties.Builder builder =
           DataReaderProperties.builder()
               .withBufferSize(bufferSize)
               .withCompression(fileReader.compressionKind)
               .withFileSystem(fileReader.fileSystem)
               .withPath(fileReader.path)
               .withTypeCount(types.size())
-              .withZeroCopy(zeroCopy)
-              .build());
+              .withZeroCopy(zeroCopy);
+      if (fileReader.file != null) {
+        builder.withFile(fileReader, fileReader.file);
+      }
+      this.dataReader = RecordReaderUtils.createDefaultDataReader(
+          builder.build());
     }
     this.dataReader.open();
     firstRow = skippedRows;

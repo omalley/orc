@@ -67,14 +67,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
-import javax.crypto.Cipher;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -3674,15 +3672,6 @@ public class TestVectorOrcFile {
     Assert.assertEquals(3500, rows.getRowNumber());
   }
 
-  public static final boolean TEST_AES_256;
-  static {
-    try {
-      TEST_AES_256 = Cipher.getMaxAllowedKeyLength("AES") != 128;
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalArgumentException("Unknown algorithm", e);
-    }
-  }
-
   public static class KeyWithMaterial extends HadoopShims.KeyMetadata {
     private final byte[] material;
 
@@ -3788,7 +3777,7 @@ public class TestVectorOrcFile {
     assertEquals(3 * ROWS, stats[3].getNumberOfValues());
     assertEquals("0.0", ((StringColumnStatistics)stats[3]).getMinimum());
     assertEquals("9.2", ((StringColumnStatistics)stats[3]).getMaximum());
-    /*
+
     rows = reader.rows();
     batch = reader.getSchema().createRowBatch();
     i = (LongColumnVector) batch.cols[0];
@@ -3813,6 +3802,5 @@ public class TestVectorOrcFile {
     }
     assertFalse(rows.nextBatch(batch));
     rows.close();
-    */
   }
 }

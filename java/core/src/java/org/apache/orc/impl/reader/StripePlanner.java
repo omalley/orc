@@ -210,7 +210,7 @@ public class StripePlanner {
       EncryptionAlgorithm algorithm = variant.getKeyDescription().getAlgorithm();
       byte[] iv = new byte[algorithm.getIvLength()];
       Key key = variant.getStripeKey(currentStripeId);
-      CryptoUtils.modifyIvForStream(column, kind, originalStripeId);
+      CryptoUtils.modifyIvForStream(column, kind, originalStripeId).accept(iv);
       return new InStream.StreamOptions(compression)
                  .withEncryption(algorithm, key, iv);
     }

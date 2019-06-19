@@ -38,7 +38,7 @@ public class ReaderEncryption {
   private final ReaderEncryptionVariant[] variants;
   // Mapping from each column to the next variant to try for that column.
   // A value of variants.length means no encryption
-  private final int[] columnVariants;
+  private final ReaderEncryptionVariant[] columnVariants;
 
   public ReaderEncryption() throws IOException {
     this(null, null, null, null, null);
@@ -56,7 +56,6 @@ public class ReaderEncryption {
       variants = new ReaderEncryptionVariant[0];
       columnVariants = null;
     } else {
-      columnVariants = new int[schema.getMaximumId() + 1];
       keyProvider = provider != null ? provider :
           HadoopShimsFactory.get().getKeyProvider(conf, new SecureRandom());
       OrcProto.Encryption encrypt = footer.getEncryption();
@@ -74,12 +73,13 @@ public class ReaderEncryption {
         variants[v] = new ReaderEncryptionVariant(keys[variant.getKey()], v,
             variant, schema, stripes, keyProvider);
       }
-      Arrays.fill(columnVariants, variants.length);
-      for(int v= variants.length - 1; v >= 0; --v) {
-        ReaderEncryptionVariant variant = variants[v];
-        TypeDescription column = variant.getRoot();
-        for(int c=column.getId(); c <= column.getMaximumId(); ++c) {
-          columnVariants[c] = v;
+      columnVariants = new ReaderEncryptionVariant[schema.getMaximumId() + 1];
+      for(int v = 0; v < variants.length; ++v) {
+        TypeDescription root = variants[v].getRoot();
+        for(int c = root.getId(); c <= root.getMaximumId(); ++c) {
+          if (columnVariants[c] == null) {
+            columnVariants[c] = variants[v];
+          }
         }
       }
     }
@@ -98,19 +98,20 @@ public class ReaderEncryption {
   }
 
   /**
-   * Do the selected columns have encryption?
-   * @param included included[c] is true if c is included
-   * @return true if we have encryption on at least one column
+   * Find the next possible variant in this file for the given column.
+   * @param column the column to find a variant for
+   * @param lastVariant the previous variant that we looked at
+   * @return the next variant or null if there are none
    */
-  public boolean hasEncryption(boolean[] included) {
-    if (keyProvider != null) {
-      for(int c=0; c < included.length; ++c) {
-        if (included[c] && columnVariants[c] < variants.length) {
-          return true;
-        }
+  private ReaderEncryptionVariant findNextVariant(int column,
+                                                  int lastVariant) {
+    for(int v = lastVariant + 1; v < variants.length; ++v) {
+      TypeDescription root = variants[v].getRoot();
+      if (root.getId() <= column && column <= root.getMaximumId()) {
+        return variants[v];
       }
     }
-    return false;
+    return null;
   }
 
   /**
@@ -123,8 +124,8 @@ public class ReaderEncryption {
    */
   public ReaderEncryptionVariant getVariant(int column) throws IOException {
     if (keyProvider != null) {
-      while (columnVariants[column] < variants.length) {
-        ReaderEncryptionVariant result = variants[columnVariants[column]];
+      while (columnVariants[column] != null) {
+        ReaderEncryptionVariant result = columnVariants[column];
         switch (result.getKeyDescription().getState()) {
         case FAILURE:
           break;
@@ -136,7 +137,7 @@ public class ReaderEncryption {
             return result;
           }
         }
-        columnVariants[column] += 1;
+        columnVariants[column] = findNextVariant(column, result.getVariantId());
       }
     }
     return null;

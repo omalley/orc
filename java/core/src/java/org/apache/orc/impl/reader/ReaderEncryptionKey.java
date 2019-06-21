@@ -102,13 +102,18 @@ public class ReaderEncryptionKey implements EncryptionKey {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null || getClass() != other.getClass()) {
       return false;
     } else if (other == this) {
       return true;
     } else {
       return compareTo((EncryptionKey) other) == 0;
     }
+  }
+
+  @Override
+  public int hashCode() {
+    return name.hashCode() * 127 + version * 7 + algorithm.hashCode();
   }
 
   @Override

@@ -3913,7 +3913,7 @@ public class TestVectorOrcFile {
             break;
           case 2:
             expected = Timestamp.valueOf(String.format("2014-12-14 12:00:00.%04d", b)).toString();
-            actual = row ->  ((TimestampColumnVector) batch.cols[2]).asScratchTimestamp(row).toString();
+            actual = row -> ((TimestampColumnVector) batch.cols[2]).asScratchTimestamp(row).toString();
             break;
           case 3:
             expected = Double.toString(b + 0.5);
@@ -3930,6 +3930,7 @@ public class TestVectorOrcFile {
           }
           assertEquals("batch " + b + " column " + c, true, batch.cols[c].noNulls);
           assertEquals("batch " + b + " column " + c + " row 0", expected, actual.apply(0));
+          // Not all of the readers set isRepeating, so if it isn't set, check the values.
           if (!batch.cols[c].isRepeating) {
             for(int r=1; r < batch.size; ++r) {
               assertEquals("batch " + b + " column " + c + " row " + r, expected, actual.apply(r));

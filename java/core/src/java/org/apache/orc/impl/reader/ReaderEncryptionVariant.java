@@ -171,6 +171,11 @@ public class ReaderEncryptionVariant implements EncryptionVariant {
   }
 
   @Override
+  public int hashCode() {
+    return key.hashCode() * 127 + column.getId();
+  }
+
+  @Override
   public int compareTo(@NotNull EncryptionVariant other) {
     if (other == this) {
       return 0;

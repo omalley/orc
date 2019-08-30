@@ -694,12 +694,6 @@
         <version>1.9.5</version>
         <scope>test</scope>
       </dependency>
-      <dependency>
-        <groupId>io.airlift</groupId>
-        <artifactId>slice</artifactId>
-        <version>0.36</version>
-        <scope>test</scope>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 </project>

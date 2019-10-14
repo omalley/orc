@@ -358,7 +358,7 @@ namespace orc {
       for (int pos = 0; pos != entry.positions_size(); ++pos) {
         position.push_back(entry.positions(pos));
       }
-      positionProviders.emplace(std::make_pair(colId, PositionProvider(position)));
+      positionProviders.insert(std::make_pair(colId, PositionProvider(position)));
     }
 
     reader->seekToRowGroup(positionProviders);

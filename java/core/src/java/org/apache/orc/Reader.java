@@ -164,6 +164,7 @@ public interface Reader extends Closeable {
     private boolean isSchemaEvolutionCaseAware =
         (boolean) OrcConf.IS_SCHEMA_EVOLUTION_CASE_SENSITIVE.getDefaultValue();
     private boolean includeAcidColumns = true;
+    private boolean useProlepticGregorian = false;
 
     public Options() {
       // PASS
@@ -176,6 +177,7 @@ public interface Reader extends Closeable {
       forcePositionalEvolution = OrcConf.FORCE_POSITIONAL_EVOLUTION.getBoolean(conf);
       isSchemaEvolutionCaseAware =
           OrcConf.IS_SCHEMA_EVOLUTION_CASE_SENSITIVE.getBoolean(conf);
+      useProlepticGregorian = OrcConf.PROLEPTIC_GREGORIAN.getBoolean(conf);
     }
 
     /**
@@ -456,4 +458,9 @@ public interface Reader extends Closeable {
    * @return Serialized file metadata read from disk for the purposes of caching, etc.
    */
   ByteBuffer getSerializedFileFooter();
+
+  /**
+   * Was the file written using the proleptic Gregorian calendar.
+   */
+  boolean writerUsedProlepticGregorian();
 }

@@ -164,7 +164,6 @@ public interface Reader extends Closeable {
     private boolean isSchemaEvolutionCaseAware =
         (boolean) OrcConf.IS_SCHEMA_EVOLUTION_CASE_SENSITIVE.getDefaultValue();
     private boolean includeAcidColumns = true;
-    private boolean useProlepticGregorian = false;
 
     public Options() {
       // PASS
@@ -177,7 +176,6 @@ public interface Reader extends Closeable {
       forcePositionalEvolution = OrcConf.FORCE_POSITIONAL_EVOLUTION.getBoolean(conf);
       isSchemaEvolutionCaseAware =
           OrcConf.IS_SCHEMA_EVOLUTION_CASE_SENSITIVE.getBoolean(conf);
-      useProlepticGregorian = OrcConf.PROLEPTIC_GREGORIAN.getBoolean(conf);
     }
 
     /**

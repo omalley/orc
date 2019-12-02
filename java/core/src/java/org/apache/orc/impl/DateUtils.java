@@ -36,34 +36,37 @@ import java.util.concurrent.TimeUnit;
  * old dates.
  */
 public class DateUtils {
+  private static SimpleDateFormat createFormatter(String fmt,
+                                                 GregorianCalendar calendar) {
+    SimpleDateFormat result = new SimpleDateFormat(fmt);
+    result.setCalendar(calendar);
+    return result;
+  }
+
   private static final String DATE = "yyyy-MM-dd";
   private static final String TIME = DATE + " HH:mm:ss";
   private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
   private static final GregorianCalendar HYBRID = new GregorianCalendar();
-  private static final SimpleDateFormat HYBRID_DATE_FORMAT =
-      new SimpleDateFormat(DATE);
-  private static final SimpleDateFormat HYBRID_TIME_FORMAT =
-      new SimpleDateFormat(TIME);
+  private static final ThreadLocal<SimpleDateFormat> HYBRID_DATE_FORMAT =
+      ThreadLocal.withInitial(() -> createFormatter(DATE, HYBRID));
+  private static final ThreadLocal<SimpleDateFormat> HYBRID_TIME_FORMAT =
+      ThreadLocal.withInitial(() -> createFormatter(TIME, HYBRID));
   private static final long SWITCHOVER_MILLIS;
   private static final long SWITCHOVER_DAYS;
   private static final GregorianCalendar PROLEPTIC = new GregorianCalendar();
-  private static final SimpleDateFormat PROLEPTIC_DATE_FORMAT =
-      new SimpleDateFormat(DATE);
-  private static final SimpleDateFormat PROLEPTIC_TIME_FORMAT =
-      new SimpleDateFormat(TIME);
+  private static final ThreadLocal<SimpleDateFormat> PROLEPTIC_DATE_FORMAT =
+      ThreadLocal.withInitial(() -> createFormatter(DATE, PROLEPTIC));
+  private static final ThreadLocal<SimpleDateFormat> PROLEPTIC_TIME_FORMAT =
+      ThreadLocal.withInitial(() -> createFormatter(TIME, PROLEPTIC));
 
   static {
     HYBRID.setTimeZone(UTC);
-    HYBRID_DATE_FORMAT.setCalendar(HYBRID);
-    HYBRID_TIME_FORMAT.setCalendar(HYBRID);
     PROLEPTIC.setTimeZone(UTC);
     PROLEPTIC.setGregorianChange(new Date(Long.MIN_VALUE));
-    PROLEPTIC_DATE_FORMAT.setCalendar(PROLEPTIC);
-    PROLEPTIC_TIME_FORMAT.setCalendar(PROLEPTIC);
 
     // Get the last day where the two calendars agree with each other.
     try {
-      SWITCHOVER_MILLIS = HYBRID_DATE_FORMAT.parse("1582-10-15").getTime();
+      SWITCHOVER_MILLIS = HYBRID_DATE_FORMAT.get().parse("1582-10-15").getTime();
       SWITCHOVER_DAYS = TimeUnit.MILLISECONDS.toDays(SWITCHOVER_MILLIS);
     } catch (ParseException e) {
       throw new IllegalArgumentException("Can't parse switch over date", e);
@@ -79,11 +82,11 @@ public class DateUtils {
   public static int convertDateToProleptic(int hybrid) {
     int proleptic = hybrid;
     if (hybrid < SWITCHOVER_DAYS) {
-      String dateStr = HYBRID_DATE_FORMAT.format(
+      String dateStr = HYBRID_DATE_FORMAT.get().format(
           new Date(TimeUnit.DAYS.toMillis(hybrid)));
       try {
         proleptic = (int) TimeUnit.MILLISECONDS.toDays(
-            PROLEPTIC_DATE_FORMAT.parse(dateStr).getTime());
+            PROLEPTIC_DATE_FORMAT.get().parse(dateStr).getTime());
       } catch (ParseException e) {
         throw new IllegalArgumentException("Can't parse " + dateStr, e);
       }
@@ -100,11 +103,11 @@ public class DateUtils {
   public static int convertDateToHybrid(int proleptic) {
     int hyrbid = proleptic;
     if (proleptic < SWITCHOVER_DAYS) {
-      String dateStr = PROLEPTIC_DATE_FORMAT.format(
+      String dateStr = PROLEPTIC_DATE_FORMAT.get().format(
           new Date(TimeUnit.DAYS.toMillis(proleptic)));
       try {
         hyrbid = (int) TimeUnit.MILLISECONDS.toDays(
-            HYBRID_DATE_FORMAT.parse(dateStr).getTime());
+            HYBRID_DATE_FORMAT.get().parse(dateStr).getTime());
       } catch (ParseException e) {
         throw new IllegalArgumentException("Can't parse " + dateStr, e);
       }
@@ -144,9 +147,9 @@ public class DateUtils {
   public static long convertTimeToProleptic(long hybrid) {
     long proleptic = hybrid;
     if (hybrid < SWITCHOVER_MILLIS) {
-      String dateStr = HYBRID_TIME_FORMAT.format(new Date(hybrid));
+      String dateStr = HYBRID_TIME_FORMAT.get().format(new Date(hybrid));
       try {
-        proleptic = PROLEPTIC_TIME_FORMAT.parse(dateStr).getTime();
+        proleptic = PROLEPTIC_TIME_FORMAT.get().parse(dateStr).getTime();
       } catch (ParseException e) {
         throw new IllegalArgumentException("Can't parse " + dateStr, e);
       }
@@ -163,9 +166,9 @@ public class DateUtils {
   public static long convertTimeToHybrid(long proleptic) {
     long hybrid = proleptic;
     if (proleptic < SWITCHOVER_MILLIS) {
-      String dateStr = PROLEPTIC_TIME_FORMAT.format(new Date(proleptic));
+      String dateStr = PROLEPTIC_TIME_FORMAT.get().format(new Date(proleptic));
       try {
-        hybrid = HYBRID_TIME_FORMAT.parse(dateStr).getTime();
+        hybrid = HYBRID_TIME_FORMAT.get().parse(dateStr).getTime();
       } catch (ParseException e) {
         throw new IllegalArgumentException("Can't parse " + dateStr, e);
       }

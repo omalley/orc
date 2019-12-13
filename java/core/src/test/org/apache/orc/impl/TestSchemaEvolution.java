@@ -351,7 +351,7 @@ public class TestSchemaEvolution {
     RecordReader rows = reader.rows(reader.options().schema(schemaOnRead));
     batch = schemaOnRead.createRowBatch();
     rows.nextBatch(batch);
-    assertEquals(74.72, ((DoubleColumnVector) batch.cols[0]).vector[0], 0.00000000001);
+    assertEquals(74.72, ((DoubleColumnVector) batch.cols[0]).vector[0], 0.00001);
     rows.close();
   }
 

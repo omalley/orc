@@ -1240,6 +1240,9 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
           .appendPattern(" HH:mm:ss[.S]")
           .toFormatter();
 
+  static final long MIN_EPOCH_SECONDS = Instant.MIN.getEpochSecond();
+  static final long MAX_EPOCH_SECONDS = Instant.MAX.getEpochSecond();
+
   /**
    * Convert a decimal to an Instant using seconds & nanos.
    * @param vector the decimal64 column vector
@@ -1250,10 +1253,14 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
     // copy the value so that we can mutate it
     HiveDecimalWritable value = new HiveDecimalWritable(vector.vector[element]);
     long seconds = value.longValue();
-    value.mutateFractionPortion();
-    value.mutateScaleByPowerOfTen(9);
-    int nanos = (int) value.longValue();
-    return Instant.ofEpochSecond(seconds, nanos);
+    if (seconds < MIN_EPOCH_SECONDS || seconds > MAX_EPOCH_SECONDS) {
+      return null;
+    } else {
+      value.mutateFractionPortion();
+      value.mutateScaleByPowerOfTen(9);
+      int nanos = (int) value.longValue();
+      return Instant.ofEpochSecond(seconds, nanos);
+    }
   }
 
   public static class StringGroupFromTimestampTreeReader extends ConvertTreeReader {
@@ -1467,7 +1474,9 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
 
     @Override
     public void setConvertVectorElement(int elementNum) {
-      long millis = longColVector.vector[elementNum] * 1000;
+      // Use as millis to be compatible with orc 1.5.x, although orc 1.6
+      // uses seconds here.
+      long millis = longColVector.vector[elementNum];
       timestampColVector.time[elementNum] = useUtc
          ? millis
          : SerializationUtils.convertFromUtc(local, millis);
@@ -1582,7 +1591,10 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
     @Override
     public void setConvertVectorElement(int elementNum) {
       Instant t = decimalToInstant(decimalColVector, elementNum);
-      if (!useUtc) {
+      if (t == null) {
+        timestampColVector.noNulls = false;
+        timestampColVector.isNull[elementNum] = true;
+      } else if (!useUtc) {
         timestampColVector.time[elementNum] =
             SerializationUtils.convertFromUtc(local, t.getEpochSecond() * 1000);
         timestampColVector.nanos[elementNum] = t.getNano();

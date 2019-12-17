@@ -305,7 +305,7 @@ public class TestProlepticConversions {
         t2D.nanos[r] = 0;
         t2s.time[r] = millis;
         t2s.nanos[r] = 0;
-        i2t.vector[r] = millis / 1000;
+        i2t.vector[r] = millis;
         d2t.vector[r] = millis / 10;
         D2t.vector[r] = millis / 1000.0;
         s2t.setVal(r, time.getBytes(StandardCharsets.UTF_8));

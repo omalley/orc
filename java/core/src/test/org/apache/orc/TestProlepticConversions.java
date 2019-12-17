@@ -352,7 +352,7 @@ public class TestProlepticConversions {
             DateUtils.printTime(D2t.time[r], readerProlepticGregorian, true));
         assertEquals("row " + r, time,
             DateUtils.printTime(s2t.time[r], readerProlepticGregorian, true));
-        assertEquals("row " + r, millis, t2i.vector[r]);
+        assertEquals("row " + r, millis/1000, t2i.vector[r]);
         assertEquals("row " + r, millis/10, t2d.vector[r]);
         assertEquals("row " + r, millis/1000.0, t2D.vector[r], 0.1);
         assertEquals("row " + r, time, t2s.toString(r));

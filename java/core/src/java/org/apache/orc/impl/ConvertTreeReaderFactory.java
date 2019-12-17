@@ -657,7 +657,8 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
       // Use TimestampWritable's getSeconds.
-      long longValue = timestampColVector.asScratchTimestamp(elementNum).getTime();
+      long longValue = TimestampUtils.millisToSeconds(
+          timestampColVector.asScratchTimestamp(elementNum).getTime());
       downCastAnyInteger(longColVector, elementNum, longValue, readerType);
     }
 

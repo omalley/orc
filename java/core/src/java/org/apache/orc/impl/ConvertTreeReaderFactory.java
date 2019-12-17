@@ -1491,10 +1491,10 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
       // Use as millis to be compatible with orc 1.5.x, although orc 1.6
       // uses seconds here.
       long millis = longColVector.vector[elementNum];
-      timestampColVector.time[elementNum] = useUtc
+      timestampColVector.time[elementNum] = Math.floorDiv(useUtc
          ? millis
-         : SerializationUtils.convertFromUtc(local, millis);
-      timestampColVector.nanos[elementNum] = 0;
+         : SerializationUtils.convertFromUtc(local, millis), 1000) * 1000;
+      timestampColVector.nanos[elementNum] = (int) (millis % 1000) * 1000000;
     }
 
     @Override

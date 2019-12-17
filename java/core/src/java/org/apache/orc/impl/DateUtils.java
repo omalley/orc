@@ -45,29 +45,27 @@ public class DateUtils {
   private static final long SWITCHOVER_MILLIS;
   private static final long SWITCHOVER_DAYS;
   private static final DateTimeFormatter HYBRID_DATE_FORMAT =
-      DateTimeFormatter.ISO_DATE
+      ConvertTreeReaderFactory.DATE_FORMAT
           .withChronology(HybridChronology.INSTANCE)
           .withZone(UTC);
   private static final DateTimeFormatter PROLEPTIC_DATE_FORMAT =
       DateTimeFormatter.ISO_LOCAL_DATE
           .withChronology(IsoChronology.INSTANCE)
           .withZone(UTC);
-  private static final DateTimeFormatter BASE_TIME_FORMAT =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private static final DateTimeFormatter HYBRID_UTC_TIME_FORMAT =
-      BASE_TIME_FORMAT
+      ConvertTreeReaderFactory.TIMESTAMP_FORMAT
           .withChronology(HybridChronology.INSTANCE)
           .withZone(UTC);
   private static final DateTimeFormatter HYBRID_LOCAL_TIME_FORMAT =
-      BASE_TIME_FORMAT
+      ConvertTreeReaderFactory.TIMESTAMP_FORMAT
           .withChronology(HybridChronology.INSTANCE)
           .withZone(LOCAL);
   private static final DateTimeFormatter PROLEPTIC_UTC_TIME_FORMAT =
-      BASE_TIME_FORMAT
+      ConvertTreeReaderFactory.TIMESTAMP_FORMAT
           .withChronology(IsoChronology.INSTANCE)
           .withZone(UTC);
   private static final DateTimeFormatter PROLEPTIC_LOCAL_TIME_FORMAT =
-      BASE_TIME_FORMAT
+      ConvertTreeReaderFactory.TIMESTAMP_FORMAT
           .withChronology(IsoChronology.INSTANCE)
           .withZone(LOCAL);
 

@@ -639,18 +639,27 @@ public class TestSchemaEvolution {
     TimestampColumnVector tcv = new TimestampColumnVector(1024);
     batch.cols[0] = tcv;
     batch.reset();
-    batch.size = 1;
+    batch.size = 3;
     tcv.time[0] = 74000L;
+    tcv.nanos[0] = 123456789;
+    tcv.time[1] = 123000L;
+    tcv.nanos[1] = 456000000;
+    tcv.time[2] = 987000;
+    tcv.nanos[2] = 0;
     writer.addRowBatch(batch);
     writer.close();
 
     Reader reader = OrcFile.createReader(testFilePath,
       OrcFile.readerOptions(conf).filesystem(fs));
-    TypeDescription schemaOnRead = TypeDescription.createDecimal().withPrecision(38).withScale(1);
+    TypeDescription schemaOnRead = TypeDescription.createDecimal().withPrecision(38).withScale(9);
     RecordReader rows = reader.rows(reader.options().schema(schemaOnRead));
     batch = schemaOnRead.createRowBatch();
-    rows.nextBatch(batch);
-    assertEquals("74", ((DecimalColumnVector) batch.cols[0]).vector[0].toString());
+    assertEquals(true, rows.nextBatch(batch));
+    assertEquals(3, batch.size);
+    DecimalColumnVector dcv = (DecimalColumnVector) batch.cols[0];
+    assertEquals("74.123456789", dcv.vector[0].toString());
+    assertEquals("123.456", dcv.vector[1].toString());
+    assertEquals("987", dcv.vector[2].toString());
     rows.close();
   }
 
@@ -678,6 +687,40 @@ public class TestSchemaEvolution {
     batch = schemaOnRead.createRowBatchV2();
     rows.nextBatch(batch);
     assertEquals(740, ((Decimal64ColumnVector) batch.cols[0]).vector[0]);
+    rows.close();
+  }
+
+  @Test
+  public void testTimestampToStringEvolution() throws Exception {
+    testFilePath = new Path(workDir, "TestOrcFile." +
+                                         testCaseName.getMethodName() + ".orc");
+    TypeDescription schema = TypeDescription.fromString("timestamp");
+    Writer writer = OrcFile.createWriter(testFilePath,
+        OrcFile.writerOptions(conf).setSchema(schema).stripeSize(100000)
+            .bufferSize(10000).useUTCTimestamp(true));
+    VectorizedRowBatch batch = schema.createRowBatchV2();
+    TimestampColumnVector tcv = (TimestampColumnVector) batch.cols[0];
+    batch.size = 3;
+    tcv.time[0] = 74000L;
+    tcv.nanos[0] = 123456789;
+    tcv.time[1] = 123000L;
+    tcv.nanos[1] = 456000000;
+    tcv.time[2] = 987000;
+    tcv.nanos[2] = 0;
+    writer.addRowBatch(batch);
+    writer.close();
+
+    schema = TypeDescription.fromString("string");
+    Reader reader = OrcFile.createReader(testFilePath,
+        OrcFile.readerOptions(conf).filesystem(fs));
+    RecordReader rows = reader.rows(reader.options().schema(schema));
+    batch = schema.createRowBatchV2();
+    BytesColumnVector bcv = (BytesColumnVector) batch.cols[0];
+    assertEquals(true, rows.nextBatch(batch));
+    assertEquals(3, batch.size);
+    assertEquals("1970-01-01 00:01:14.123456789", bcv.toString(0));
+    assertEquals("1970-01-01 00:02:03.456", bcv.toString(1));
+    assertEquals("1970-01-01 00:16:27", bcv.toString(2));
     rows.close();
   }
 

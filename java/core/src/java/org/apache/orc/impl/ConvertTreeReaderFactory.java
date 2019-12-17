@@ -27,6 +27,7 @@ import java.time.chrono.IsoChronology;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.util.EnumMap;
 import java.util.Map;
@@ -656,8 +657,7 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
       // Use TimestampWritable's getSeconds.
-      long longValue = TimestampUtils.millisToSeconds(
-          timestampColVector.asScratchTimestamp(elementNum).getTime());
+      long longValue = timestampColVector.asScratchTimestamp(elementNum).getTime();
       downCastAnyInteger(longColVector, elementNum, longValue, readerType);
     }
 
@@ -1227,7 +1227,12 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
    * Eg. "2019-07-09"
    */
   static final DateTimeFormatter DATE_FORMAT =
-      new DateTimeFormatterBuilder().appendPattern("uuuu-MM-dd")
+      new DateTimeFormatterBuilder()
+          .appendValue(ChronoField.YEAR, 4, 10, SignStyle.EXCEEDS_PAD)
+          .appendLiteral('-')
+          .appendValue(ChronoField.MONTH_OF_YEAR, 2)
+          .appendLiteral('-')
+          .appendValue(ChronoField.DAY_OF_MONTH, 2)
           .toFormatter();
 
   /**
@@ -1235,10 +1240,18 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
    * Eg. "2019-07-09 13:11:00"
    */
   static final DateTimeFormatter TIMESTAMP_FORMAT =
-      new DateTimeFormatterBuilder()
-          .append(DATE_FORMAT)
-          .appendPattern(" HH:mm:ss[.S]")
-          .toFormatter();
+          new DateTimeFormatterBuilder()
+                .append(DATE_FORMAT)
+                .appendLiteral(' ')
+                .appendValue(ChronoField.HOUR_OF_DAY, 2)
+                .appendLiteral(':')
+                .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+                .optionalStart()
+                .appendLiteral(':')
+                .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+                .optionalStart()
+                .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+                .toFormatter();
 
   static final long MIN_EPOCH_SECONDS = Instant.MIN.getEpochSecond();
   static final long MAX_EPOCH_SECONDS = Instant.MAX.getEpochSecond();

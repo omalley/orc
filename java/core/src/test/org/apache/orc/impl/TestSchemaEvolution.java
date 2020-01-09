@@ -1707,19 +1707,23 @@ public class TestSchemaEvolution {
   // place.
 
   static String decimalTimestampToString(long centiseconds, ZoneId zone) {
-    long sec = centiseconds / 100;
-    int nano = (int) ((centiseconds % 100) * 10_000_000);
-    return timestampToString(sec, nano, zone);
+    int nano = (int) (Math.floorMod(centiseconds, 100) * 10_000_000);
+    return timestampToString(centiseconds * 10, nano, zone);
   }
 
   static String doubleTimestampToString(double seconds, ZoneId zone) {
-    long sec = (long) seconds;
+    long sec = (long) Math.floor(seconds);
     int nano = 1_000_000 * (int) Math.round((seconds - sec) * 1000);
-    return timestampToString(sec, nano, zone);
+    return timestampToString(sec * 1000, nano, zone);
   }
 
-  static String timestampToString(long seconds, int nanos, ZoneId zone) {
-    return timestampToString(Instant.ofEpochSecond(seconds, nanos), zone);
+  static String timestampToString(long millis, int nanos, ZoneId zone) {
+    return timestampToString(Instant.ofEpochSecond(Math.floorDiv(millis, 1000),
+        nanos), zone);
+  }
+
+  static String longTimestampToString(long millis, ZoneId zone) {
+    return timestampToString(Instant.ofEpochMilli(millis), zone);
   }
 
   static String timestampToString(Instant time, ZoneId zone) {
@@ -1744,7 +1748,7 @@ public class TestSchemaEvolution {
       for (int r = 0; r < values.length; ++r) {
         int row = batch.size++;
         Instant t = Instant.from(formatter.parse(values[r]));
-        t1.time[row] = t.getEpochSecond() * 1000;
+        t1.time[row] = t.toEpochMilli();
         t1.nanos[row] = t.getNano();
         if (batch.size == 1024) {
           writer.addRowBatch(batch);
@@ -1818,7 +1822,7 @@ public class TestSchemaEvolution {
             }
             assertEquals("row " + r, (timeStrings[r] + " " +
                                           READER_ZONE.getId()).replace(".7 ", " "),
-                timestampToString(t1.vector[current], 0, READER_ZONE));
+                longTimestampToString(t1.vector[current] * 1000, READER_ZONE));
             current += 1;
           }
           assertEquals(false, rows.nextBatch(batch));
@@ -1916,9 +1920,10 @@ public class TestSchemaEvolution {
               assertEquals("row " + r, true, rows.nextBatch(batch));
               current = 0;
             }
+            // differs from master because of the change to standardize
             assertEquals("row " + r, (timeStrings[r] + " " +
                                           UTC.getId()).replace(".7 ", " "),
-                timestampToString(t1.vector[current], 0, UTC));
+                longTimestampToString(t1.vector[current] * 1000, UTC));
             current += 1;
           }
           assertEquals(false, rows.nextBatch(batch));
@@ -2133,22 +2138,22 @@ public class TestSchemaEvolution {
           String expectedDate1 = midnight + " " + READER_ZONE.getId();
 
           assertEquals("row " + r, expected1.replace(".1 ", " "),
-              timestampToString(l1.time[current] / 1000, l1.nanos[current], READER_ZONE));
+              timestampToString(l1.time[current], l1.nanos[current], READER_ZONE));
 
-          assertEquals("row " + r, timestampToString(-offset, (r % 128) * 1000000, READER_ZONE),
-              timestampToString(t1.time[current] / 1000, t1.nanos[current], READER_ZONE));
-
-          assertEquals("row " + r, expected1,
-              timestampToString(d1.time[current] / 1000, d1.nanos[current], READER_ZONE));
+          assertEquals("row " + r, timestampToString(-offset * 1000, (r % 128) * 1000000, READER_ZONE),
+              timestampToString(t1.time[current], t1.nanos[current], READER_ZONE));
 
           assertEquals("row " + r, expected1,
-              timestampToString(dbl1.time[current] / 1000, dbl1.nanos[current], READER_ZONE));
+              timestampToString(d1.time[current], d1.nanos[current], READER_ZONE));
+
+          assertEquals("row " + r, expected1,
+              timestampToString(dbl1.time[current], dbl1.nanos[current], READER_ZONE));
 
           assertEquals("row " + r, expectedDate1,
-              timestampToString(dt1.time[current] / 1000, dt1.nanos[current], READER_ZONE));
+              timestampToString(dt1.time[current], dt1.nanos[current], READER_ZONE));
 
           assertEquals("row " + r, expected1,
-              timestampToString(s1.time[current] / 1000, s1.nanos[current], READER_ZONE));
+              timestampToString(s1.time[current], s1.nanos[current], READER_ZONE));
 
           current += 1;
         }
@@ -2172,19 +2177,19 @@ public class TestSchemaEvolution {
           String expectedDate = midnight + " " + UTC.getId();
 
           assertEquals("row " + r, expected1.replace(".1 ", " "),
-              timestampToString(l1.time[current] / 1000, l1.nanos[current], UTC));
+              timestampToString(l1.time[current], l1.nanos[current], UTC));
 
           assertEquals("row " + r, expected1,
-              timestampToString(d1.time[current] / 1000, d1.nanos[current], UTC));
+              timestampToString(d1.time[current], d1.nanos[current], UTC));
 
           assertEquals("row " + r, expected1,
-              timestampToString(dbl1.time[current] / 1000, dbl1.nanos[current], UTC));
+              timestampToString(dbl1.time[current], dbl1.nanos[current], UTC));
 
           assertEquals("row " + r, expectedDate,
-              timestampToString(dt1.time[current] / 1000, dt1.nanos[current], UTC));
+              timestampToString(dt1.time[current], dt1.nanos[current], UTC));
 
           assertEquals("row " + r, expected1,
-              timestampToString(s1.time[current] / 1000, s1.nanos[current], UTC));
+              timestampToString(s1.time[current], s1.nanos[current], UTC));
           current += 1;
         }
         assertEquals(false, rows.nextBatch(batch));
@@ -2199,14 +2204,14 @@ public class TestSchemaEvolution {
     floatAndDoubleToTimeStampOverflow("double",
         340282347000000000000000000000000000000000.0,
         1e16,
-        9223372036854775.0,
+        9223372036854778.0,
         9000000000000000.1,
         10000000000.0,
         10000000.123,
         -1000000.123,
         -10000000000.0,
         -9000000000000000.1,
-        -9223372036854775.0,
+        -9223372036854778.0,
         -1e16,
         -340282347000000000000000000000000000000000.0);
   }
@@ -2216,14 +2221,14 @@ public class TestSchemaEvolution {
     floatAndDoubleToTimeStampOverflow("float",
         340282347000000000000000000000000000000000.0,
         1e16,
-        9223372036854775.0,
+        9223372036854778.0,
         9000000000000000.1,
         10000000000.0,
         10000000.123,
         -1000000.123,
         -10000000000.0,
         -9000000000000000.1,
-        -9223372036854775.0,
+        -9223372036854778.0,
         -1e16,
         -340282347000000000000000000000000000000000.0);
   }
@@ -2279,7 +2284,8 @@ public class TestSchemaEvolution {
             assertFalse(rowName, t1.noNulls);
             assertTrue(rowName, t1.isNull[row]);
           } else {
-            double actual = t1.time[row] / 1000.0 + t1.nanos[row] / 1_000_000_000.0;
+            double actual = Math.floorDiv(t1.time[row], 1000) +
+                                t1.nanos[row] / 1_000_000_000.0;
             assertEquals(rowName, expected, actual,
                 Math.abs(expected * (isFloat ? 0.000001 : 0.0000000000000001)));
             assertFalse(rowName, t1.isNull[row]);

@@ -205,8 +205,9 @@ public class DateUtils {
     }
   }
 
-  public static String printTime(long time, boolean fromProleptic, boolean useUtc) {
-    return getTimeFormat(fromProleptic, useUtc).format(Instant.ofEpochMilli(time));
+  public static String printTime(long millis, boolean fromProleptic,
+                                 boolean useUtc) {
+    return getTimeFormat(fromProleptic, useUtc).format(Instant.ofEpochMilli(millis));
   }
 
   private DateUtils() {

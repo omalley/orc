@@ -19,6 +19,7 @@ package org.apache.orc.impl;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -656,10 +657,9 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
 
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
-      // Use TimestampWritable's getSeconds.
-      long longValue = TimestampUtils.millisToSeconds(
-          timestampColVector.asScratchTimestamp(elementNum).getTime());
-      downCastAnyInteger(longColVector, elementNum, longValue, readerType);
+      long millis = timestampColVector.asScratchTimestamp(elementNum).getTime();
+      long seconds = Math.floorDiv(millis, 1000);
+      downCastAnyInteger(longColVector, elementNum, seconds, readerType);
     }
 
     @Override
@@ -818,8 +818,13 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
 
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
-      doubleColVector.vector[elementNum] = TimestampUtils.getDouble(
-          timestampColVector.asScratchTimestamp(elementNum));
+      Timestamp ts = timestampColVector.asScratchTimestamp(elementNum);
+      double result = Math.floorDiv(ts.getTime(), 1000);
+      int nano = ts.getNanos();
+      if (nano != 0) {
+        result += nano / 1_000_000_000.0;
+      }
+      doubleColVector.vector[elementNum] = result;
     }
 
     @Override
@@ -1011,9 +1016,13 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
 
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
-      double doubleValue = TimestampUtils.getDouble(
-          timestampColVector.asScratchTimestamp(elementNum));
-      HiveDecimal value = HiveDecimal.create(Double.toString(doubleValue));
+      long seconds = Math.floorDiv(timestampColVector.time[elementNum], 1000);
+      long nanos = timestampColVector.nanos[elementNum];
+      if (seconds < 0 && nanos > 0) {
+        seconds += 1;
+        nanos = 1_000_000_000 - nanos;
+      }
+      HiveDecimal value = HiveDecimal.create(String.format("%d.%09d", seconds, nanos));
       if (value != null) {
         // The DecimalColumnVector will enforce precision and scale and set the entry to null when out of bounds.
         if (decimalColVector instanceof Decimal64ColumnVector) {
@@ -1302,7 +1311,8 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
 
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
-      Instant instant = Instant.ofEpochSecond(timestampColVector.time[elementNum] / 1000,
+      Instant instant = Instant.ofEpochSecond(Math.floorDiv(
+          timestampColVector.time[elementNum], 1000),
           timestampColVector.nanos[elementNum]);
       byte[] bytes = instant.atZone(local).format(formatter)
                          .getBytes(StandardCharsets.UTF_8);
@@ -1491,10 +1501,12 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
       // Use as millis to be compatible with orc 1.5.x, although orc 1.6
       // uses seconds here.
       long millis = longColVector.vector[elementNum];
-      timestampColVector.time[elementNum] = Math.floorDiv(useUtc
-         ? millis
-         : SerializationUtils.convertFromUtc(local, millis), 1000) * 1000;
-      timestampColVector.nanos[elementNum] = (int) (millis % 1000) * 1000000;
+      if (!useUtc) {
+        millis = SerializationUtils.convertFromUtc(local, millis);
+      }
+      timestampColVector.time[elementNum] = millis;
+      timestampColVector.nanos[elementNum] =
+          (int) Math.floorMod(millis, 1000) * 1_000_000;
     }
 
     @Override
@@ -1540,11 +1552,9 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
       if (!useUtc) {
         seconds = SerializationUtils.convertFromUtc(local, seconds);
       }
-      long wholeSec = (long) Math.floor(seconds);
-
       // overflow
       double doubleMillis = seconds * 1000;
-      long millis = wholeSec * 1000;
+      long millis = Math.round(doubleMillis);
       if (doubleMillis > Long.MAX_VALUE || doubleMillis < Long.MIN_VALUE ||
               ((millis >= 0) != (doubleMillis >= 0))) {
         timestampColVector.time[elementNum] = 0L;
@@ -1552,9 +1562,9 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
         timestampColVector.isNull[elementNum] = true;
         timestampColVector.noNulls = false;
       } else {
-        timestampColVector.time[elementNum] = wholeSec * 1000;
+        timestampColVector.time[elementNum] = millis;
         timestampColVector.nanos[elementNum] =
-            1_000_000 * (int) Math.round((seconds - wholeSec) * 1000);
+            (int) Math.floorMod(millis, 1000) * 1_000_000;
       }
     }
 
@@ -1609,11 +1619,12 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
         timestampColVector.noNulls = false;
         timestampColVector.isNull[elementNum] = true;
       } else if (!useUtc) {
+        long millis = t.toEpochMilli();
         timestampColVector.time[elementNum] =
-            SerializationUtils.convertFromUtc(local, t.getEpochSecond() * 1000);
+            SerializationUtils.convertFromUtc(local, millis);
         timestampColVector.nanos[elementNum] = t.getNano();
       } else {
-        timestampColVector.time[elementNum] = t.getEpochSecond() * 1000;
+        timestampColVector.time[elementNum] = t.toEpochMilli();
         timestampColVector.nanos[elementNum] = t.getNano();
       }
     }
@@ -1667,8 +1678,8 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
           elementNum);
       try {
         Instant instant = Instant.from(formatter.parse(str));
-        timestampColVector.time[elementNum] = instant.getEpochSecond() * 1000;
-        timestampColVector.nanos[elementNum] = instant.get(ChronoField.NANO_OF_SECOND);
+        timestampColVector.time[elementNum] = instant.toEpochMilli();
+        timestampColVector.nanos[elementNum] = instant.getNano();
       } catch (DateTimeParseException e) {
         timestampColVector.noNulls = false;
         timestampColVector.isNull[elementNum] = true;
@@ -1818,7 +1829,8 @@ public class ConvertTreeReaderFactory extends TreeReaderFactory {
     @Override
     public void setConvertVectorElement(int elementNum) throws IOException {
       LocalDate day = LocalDate.from(
-          Instant.ofEpochSecond(timestampColVector.time[elementNum] / 1000,
+          Instant.ofEpochSecond(
+              Math.floorDiv(timestampColVector.time[elementNum], 1000),
               timestampColVector.nanos[elementNum])
               .atZone(local));
       longColVector.vector[elementNum] = day.toEpochDay();

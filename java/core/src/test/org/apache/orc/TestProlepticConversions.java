@@ -293,20 +293,20 @@ public class TestProlepticConversions {
       t2D.changeCalendar(writerProlepticGregorian, false);
       t2s.changeCalendar(writerProlepticGregorian, false);
 
-      GregorianCalendar cal = writerProlepticGregorian ? PROLEPTIC : HYBRID;
       for(int r=0; r < batch.size; ++r) {
-        String time = String.format("%04d-03-21 %02d:12:34", 2 * r + 1, r % 24);
+        String time = String.format("%04d-03-21 %02d:12:34.12", 2 * r + 1, r % 24);
         long millis = DateUtils.parseTime(time, writerProlepticGregorian, true);
+        int nanos = (int) Math.floorMod(millis, 1000) * 1_000_000;
         t2i.time[r] = millis;
-        t2i.nanos[r] = 0;
+        t2i.nanos[r] = nanos;
         t2d.time[r] = millis;
-        t2d.nanos[r] = 0;
+        t2d.nanos[r] = nanos;
         t2D.time[r] = millis;
-        t2D.nanos[r] = 0;
+        t2D.nanos[r] = nanos;
         t2s.time[r] = millis;
-        t2s.nanos[r] = 0;
+        t2s.nanos[r] = nanos;
         i2t.vector[r] = millis;
-        d2t.vector[r] = millis / 10;
+        d2t.vector[r] = Math.floorDiv(millis, 10);
         D2t.vector[r] = millis / 1000.0;
         s2t.setVal(r, time.getBytes(StandardCharsets.UTF_8));
       }
@@ -342,7 +342,7 @@ public class TestProlepticConversions {
       assertEquals(readerProlepticGregorian, D2t.usingProlepticCalendar());
       assertEquals(readerProlepticGregorian, s2t.usingProlepticCalendar());
       for(int r=0; r < batch.size; ++r) {
-        String time = String.format("%04d-03-21 %02d:12:34", 2 * r + 1, r % 24);
+        String time = String.format("%04d-03-21 %02d:12:34.12", 2 * r + 1, r % 24);
         long millis = DateUtils.parseTime(time, readerProlepticGregorian, true);
         assertEquals("row " + r, time,
             DateUtils.printTime(i2t.time[r], readerProlepticGregorian, true));
@@ -352,7 +352,7 @@ public class TestProlepticConversions {
             DateUtils.printTime(D2t.time[r], readerProlepticGregorian, true));
         assertEquals("row " + r, time,
             DateUtils.printTime(s2t.time[r], readerProlepticGregorian, true));
-        assertEquals("row " + r, millis/1000, t2i.vector[r]);
+        assertEquals("row " + r, Math.floorDiv(millis, 1000), t2i.vector[r]);
         assertEquals("row " + r, millis/10, t2d.vector[r]);
         assertEquals("row " + r, millis/1000.0, t2D.vector[r], 0.1);
         assertEquals("row " + r, time, t2s.toString(r));

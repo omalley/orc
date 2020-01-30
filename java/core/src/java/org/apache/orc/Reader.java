@@ -22,9 +22,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 
 /**
  * The interface for reading ORC files.
@@ -187,6 +189,8 @@ public interface Reader extends Closeable {
     private Boolean useZeroCopy = null;
     private Boolean skipCorruptRecords = null;
     private TypeDescription schema = null;
+    private String[] skipRowColumns = null;
+    Consumer<VectorizedRowBatch> skipRowCallback = null;
     private DataReader dataReader = null;
     private Boolean tolerateMissingSchema = null;
     private boolean forcePositionalEvolution;
@@ -234,6 +238,12 @@ public interface Reader extends Closeable {
      */
     public Options schema(TypeDescription schema) {
       this.schema = schema;
+      return this;
+    }
+
+    public Options setFilter(String[] filterColumnNames, Consumer<VectorizedRowBatch> filterCallback) {
+      this.skipRowColumns = filterColumnNames;
+      this.skipRowCallback =  filterCallback;
       return this;
     }
 
@@ -334,6 +344,14 @@ public interface Reader extends Closeable {
 
     public SearchArgument getSearchArgument() {
       return sarg;
+    }
+
+    public Consumer<VectorizedRowBatch> getFilterCallback() {
+      return skipRowCallback;
+    }
+
+    public String[] getFilterColumnNames(){
+      return skipRowColumns;
     }
 
     public String[] getColumnNames() {

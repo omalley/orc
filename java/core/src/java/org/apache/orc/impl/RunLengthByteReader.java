@@ -20,6 +20,7 @@ package org.apache.orc.impl;
 import java.io.EOFException;
 import java.io.IOException;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 
 /**
@@ -29,21 +30,23 @@ import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
  */
 public class RunLengthByteReader {
   private InStream input;
+  private IOUtils ioUtilsInstance;
   private final byte[] literals =
     new byte[RunLengthByteWriter.MAX_LITERAL_SIZE];
   private int numLiterals = 0;
   private int used = 0;
   private boolean repeat = false;
 
-  public RunLengthByteReader(InStream input) {
+  public RunLengthByteReader(InStream input, IOUtils ioUtilsInstance) {
     this.input = input;
+    this.ioUtilsInstance = ioUtilsInstance;
   }
 
   public void setInStream(InStream input) {
     this.input = input;
   }
 
-  private void readValues(boolean ignoreEof) throws IOException {
+  private void readValues(boolean ignoreEof, int numSkipRows) throws IOException {
     int control = input.read();
     used = 0;
     if (control == -1) {
@@ -55,15 +58,23 @@ public class RunLengthByteReader {
     } else if (control < 0x80) {
       repeat = true;
       numLiterals = control + RunLengthByteWriter.MIN_REPEAT_SIZE;
-      int val = input.read();
-      if (val == -1) {
-        throw new EOFException("Reading RLE byte got EOF");
+      if (numSkipRows >= numLiterals) {
+        ioUtilsInstance.skipFully(input,1);
+      } else {
+        int val = input.read();
+        if (val == -1) {
+          throw new EOFException("Reading RLE byte got EOF");
+        }
+        literals[0] = (byte) val;
       }
-      literals[0] = (byte) val;
     } else {
       repeat = false;
       numLiterals = 0x100 - control;
-      int bytes = 0;
+      numSkipRows = Math.min(numSkipRows, numLiterals);
+      if (numSkipRows > 0) {
+        ioUtilsInstance.skipFully(input, numSkipRows);
+      }
+      int bytes = numSkipRows;
       while (bytes < numLiterals) {
         int result = input.read(literals, bytes, numLiterals - bytes);
         if (result == -1) {
@@ -81,7 +92,7 @@ public class RunLengthByteReader {
   public byte next() throws IOException {
     byte result;
     if (used == numLiterals) {
-      readValues(false);
+      readValues(false, 0);
     }
     if (repeat) {
       result = literals[0];
@@ -145,7 +156,7 @@ public class RunLengthByteReader {
     if (consumed != 0) {
       // a loop is required for cases where we break the run into two parts
       while (consumed > 0) {
-        readValues(false);
+        readValues(false, 0);
         used = consumed;
         consumed -= numLiterals;
       }
@@ -158,7 +169,7 @@ public class RunLengthByteReader {
   public void skip(long items) throws IOException {
     while (items > 0) {
       if (used == numLiterals) {
-        readValues(false);
+        readValues(false, (int) items);
       }
       long consume = Math.min(items, numLiterals - used);
       used += consume;

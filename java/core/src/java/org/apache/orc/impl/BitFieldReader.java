@@ -20,6 +20,7 @@ package org.apache.orc.impl;
 import java.io.EOFException;
 import java.io.IOException;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 
 public final class BitFieldReader {
@@ -27,8 +28,8 @@ public final class BitFieldReader {
   private int current;
   private byte currentIdx = 8;
 
-  public BitFieldReader(InStream input) {
-    this.input = new RunLengthByteReader(input);
+  public BitFieldReader(InStream input, IOUtils ioUtilsInstance) {
+    this.input = new RunLengthByteReader(input, ioUtilsInstance);
   }
 
   private void readByte() throws IOException {
@@ -48,6 +49,38 @@ public final class BitFieldReader {
     currentIdx++;
     // Highest bit is the first val
     return ((current >>> (8 - currentIdx)) & 1);
+  }
+
+  public void nextVector(LongColumnVector previous,
+                         TreeReaderFactory.FilterContext filterContext,
+                         long previousLen) throws IOException {
+    previous.isRepeating = false;
+    int previousIdx = 0;
+    if (previous.noNulls) {
+      for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+        int idx = filterContext.getSelected()[i];
+        if (idx - previousIdx > 0) {
+          skip(idx - previousIdx);
+        }
+        previous.vector[idx] = next();
+        previousIdx = idx + 1;
+      }
+      skip(previousLen - previousIdx);
+    } else {
+      for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+        int idx = filterContext.getSelected()[i];
+        if (idx - previousIdx > 0) {
+          skip(TreeReaderFactory.TreeReader.countNonNullRowsInRange(previous.isNull, previousIdx, idx));
+        }
+        if (!previous.isNull[idx]) {
+          previous.vector[idx] = next();
+        } else {
+          previous.vector[idx] = 1;
+        }
+        previousIdx = idx + 1;
+      }
+      skip(TreeReaderFactory.TreeReader.countNonNullRowsInRange(previous.isNull, previousIdx, (int)previousLen));
+    }
   }
 
   public void nextVector(LongColumnVector previous,
@@ -95,8 +128,11 @@ public final class BitFieldReader {
     } else {
       final long bitsToSkip = (totalBits - availableBits);
       input.skip(bitsToSkip / 8);
-      current = input.next();
-      currentIdx = (byte) (bitsToSkip % 8);
+      // Edge case: when skipping the last bits of a bitField there is nothing more to read!
+      if (input.hasNext()) {
+        current = input.next();
+        currentIdx = (byte) (bitsToSkip % 8);
+      }
     }
   }
 

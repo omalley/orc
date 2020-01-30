@@ -22,10 +22,14 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
@@ -43,6 +47,7 @@ import org.apache.hadoop.hive.ql.exec.vector.UnionColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.StringExpr;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
+import org.apache.commons.io.IOUtils;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.OrcProto;
@@ -56,6 +61,10 @@ import org.apache.orc.impl.writer.TimestampTreeWriter;
 public class TreeReaderFactory {
   public interface Context {
     SchemaEvolution getSchemaEvolution();
+
+    Set<Integer> getColumnFilterIds();
+
+    Consumer<VectorizedRowBatch> getColumnFilterCallback();
 
     boolean isSkipCorrupt();
 
@@ -72,6 +81,8 @@ public class TreeReaderFactory {
     boolean fileUsedProlepticGregorian();
   }
 
+  private static MutableFilterContext mutableFilterContext = new MutableFilterContext();
+
   public static class ReaderContext implements Context {
     private SchemaEvolution evolution;
     private boolean skipCorrupt = false;
@@ -81,6 +92,8 @@ public class TreeReaderFactory {
     private ReaderEncryption encryption;
     private boolean useProlepticGregorian;
     private boolean fileUsedProlepticGregorian;
+    private Set<Integer> filterColumnIds = Collections.emptySet();
+    Consumer<VectorizedRowBatch> filterCallback;
 
     public ReaderContext setSchemaEvolution(SchemaEvolution evolution) {
       this.evolution = evolution;
@@ -89,6 +102,12 @@ public class TreeReaderFactory {
 
     public ReaderContext setEncryption(ReaderEncryption value) {
       encryption = value;
+      return this;
+    }
+
+    public ReaderContext setFilterCallback(Set<Integer> filterColumnsList, Consumer<VectorizedRowBatch> filterCallback) {
+      this.filterColumnIds = filterColumnsList;
+      this.filterCallback = filterCallback;
       return this;
     }
 
@@ -122,6 +141,16 @@ public class TreeReaderFactory {
     @Override
     public SchemaEvolution getSchemaEvolution() {
       return evolution;
+    }
+
+    @Override
+    public Set<Integer> getColumnFilterIds() {
+      return filterColumnIds;
+    }
+
+    @Override
+    public Consumer<VectorizedRowBatch> getColumnFilterCallback() {
+      return filterCallback;
     }
 
     @Override
@@ -160,11 +189,152 @@ public class TreeReaderFactory {
     }
   }
 
+  public static abstract class FilterContext {
+    protected boolean currBatchIsSelectedInUse = false;
+    protected int[] currBatchSelected = null;
+    protected int currBatchSelectedSize = 0;
+
+    public FilterContext() {
+      super();
+    }
+
+    /**
+     * Reset FilterContext variables
+     */
+    public void resetFilterContext() {
+      this.currBatchIsSelectedInUse = false;
+      this.currBatchSelected = null;
+      this.currBatchSelectedSize = 0;
+    }
+
+    /**
+     * Is the filter applied?
+     *
+     * @return true if the filter is actually applied
+     */
+    public boolean isSelectedInUse() {
+      return this.currBatchIsSelectedInUse;
+    }
+
+    /**
+     * Return an int array with the rows that pass the filter.
+     * Do not modify the array returned!
+     *
+     * @return int array
+     */
+    public int[] getSelected() {
+      return this.currBatchSelected;
+    }
+
+    /**
+     * Return the number of rows that pass the filter
+     *
+     * @return an int
+     */
+    public int getSelectedSize() {
+      return this.currBatchSelectedSize;
+    }
+  }
+
+  public static class MutableFilterContext extends FilterContext {
+
+    /**
+     * Set context with the given values by reference
+     *
+     * @param isSelectedInUse if the filter is applied
+     * @param selected an array of the selected rows
+     * @param selectedSize the number of the selected rows
+     */
+    public void setFilterContext(boolean isSelectedInUse, int[] selected, int selectedSize) {
+      this.currBatchIsSelectedInUse = isSelectedInUse;
+      this.currBatchSelected = selected;
+      this.currBatchSelectedSize = selectedSize;
+      // Avoid selected.length < selectedSize since we can borrow a larger array for selected
+      // debug loop for checking if selected is in order without duplicates (i.e [1,1,1] is illegal)
+      for (int i = 0; i < selectedSize-1; i++)
+        assert selected[i] < selected[i+1];
+    }
+
+    /**
+     * Copy context variables from the a given FilterContext.
+     * Always does a deep copy of the data.
+     *
+     * @param other FilterContext to copy from
+     */
+    public void copyFilterContextFrom(MutableFilterContext other) {
+      // assert if copying into self
+      assert this != other;
+
+      if (this.currBatchSelected == null || this.currBatchSelected.length < other.currBatchSelectedSize) {
+        // note: still allocating a full size buffer, for later use
+        this.currBatchSelected = Arrays.copyOf(other.currBatchSelected, other.currBatchSelected.length);
+      } else {
+        System.arraycopy(other.currBatchSelected, 0, this.currBatchSelected, 0, other.currBatchSelectedSize);
+      }
+      this.currBatchSelectedSize = other.currBatchSelectedSize;
+      this.currBatchIsSelectedInUse = other.currBatchIsSelectedInUse;
+    }
+
+    /**
+     * Borrow the current selected array to be modified if it satisfies minimum capacity.
+     * If it is too small or unset, allocates one.
+     * This method never returns null!
+     *
+     * @param minCapacity
+     * @return the current selected array to be modified
+     */
+    public int[] borrowSelected(int minCapacity) {
+      int[] existing = this.currBatchSelected;
+      this.currBatchSelected = null;
+      if (existing == null || existing.length < minCapacity) {
+        return new int[minCapacity];
+      }
+      return existing;
+    }
+
+    /**
+     * Get the immutable version of the current FilterContext
+     * @return
+     */
+    public FilterContext immutable(){
+      return this;
+    }
+
+    /**
+     * Set the selectedInUse boolean showing if the filter is applied
+     *
+     * @param selectedInUse
+     */
+    public void setSelectedInUse(boolean selectedInUse) {
+      this.currBatchIsSelectedInUse = selectedInUse;
+    }
+
+    /**
+     * Set the array of the rows that pass the filter by reference
+     *
+     * @param selectedArray
+     */
+    public void setSelected(int[] selectedArray) {
+      this.currBatchSelected = selectedArray;
+    }
+
+    /**
+     * Set the number of the rows that pass the filter
+     *
+     * @param selectedSize
+     */
+    public void setSelectedSize(int selectedSize) {
+      this.currBatchSelectedSize = selectedSize;
+    }
+  }
+
   public abstract static class TreeReader {
     protected final int columnId;
     protected BitFieldReader present = null;
     protected int vectorColumnCount;
     protected final Context context;
+    protected FilterContext filterContext;
+    protected IOUtils ioUtilsInstance;
 
     static final long[] powerOfTenTable = {
         1L,                   // 0
@@ -195,12 +365,15 @@ public class TreeReaderFactory {
     protected TreeReader(int columnId, InStream in, Context context) throws IOException {
       this.columnId = columnId;
       this.context = context;
+      this.vectorColumnCount = -1;
+      this.ioUtilsInstance = new IOUtils();
       if (in == null) {
         present = null;
       } else {
-        present = new BitFieldReader(in);
+        present = new BitFieldReader(in, ioUtilsInstance);
       }
       vectorColumnCount = -1;
+      this.filterContext = new MutableFilterContext();
     }
 
     void setVectorColumnCount(int vectorColumnCount) {
@@ -237,7 +410,7 @@ public class TreeReaderFactory {
       if (in == null) {
         present = null;
       } else {
-        present = new BitFieldReader(in);
+        present = new BitFieldReader(in, ioUtilsInstance);
       }
     }
 
@@ -255,6 +428,15 @@ public class TreeReaderFactory {
       if (present != null) {
         present.seek(index);
       }
+    }
+
+    protected static int countNonNullRowsInRange(boolean[] isNull, int start, int end) {
+      int result = 0;
+      while (start < end) {
+        if (!isNull[start++])
+          result++;
+      }
+      return result;
     }
 
     protected long countNonNulls(long rows) throws IOException {
@@ -337,6 +519,10 @@ public class TreeReaderFactory {
     public int getColumnId() {
       return columnId;
     }
+
+    public void setFilterContext(FilterContext filterContext) {
+      this.filterContext = filterContext;
+    }
   }
 
   public static class NullTreeReader extends TreeReader {
@@ -383,7 +569,7 @@ public class TreeReaderFactory {
     protected BooleanTreeReader(int columnId, InStream present, InStream data) throws IOException {
       super(columnId, present, null);
       if (data != null) {
-        reader = new BitFieldReader(data);
+        reader = new BitFieldReader(data, ioUtilsInstance);
       }
     }
 
@@ -391,7 +577,7 @@ public class TreeReaderFactory {
     void startStripe(StripePlanner planner) throws IOException {
       super.startStripe(planner);
       reader = new BitFieldReader(planner.getStream(new StreamName(columnId,
-          OrcProto.Stream.Kind.DATA)));
+          OrcProto.Stream.Kind.DATA)), ioUtilsInstance);
     }
 
     @Override
@@ -419,8 +605,12 @@ public class TreeReaderFactory {
       // Read present/isNull stream
       super.nextVector(result, isNull, batchSize);
 
-      // Read value entries based on isNull entries
-      reader.nextVector(result, batchSize);
+      if (filterContext.isSelectedInUse()) {
+        reader.nextVector(result, filterContext, batchSize);
+      } else {
+        // Read value entries based on isNull entries
+        reader.nextVector(result, batchSize);
+      }
     }
   }
 
@@ -433,14 +623,14 @@ public class TreeReaderFactory {
 
     protected ByteTreeReader(int columnId, InStream present, InStream data) throws IOException {
       super(columnId, present, null);
-      this.reader = new RunLengthByteReader(data);
+      this.reader = new RunLengthByteReader(data, ioUtilsInstance);
     }
 
     @Override
     void startStripe(StripePlanner planner) throws IOException {
       super.startStripe(planner);
       reader = new RunLengthByteReader(planner.getStream(new StreamName(columnId,
-          OrcProto.Stream.Kind.DATA)));
+          OrcProto.Stream.Kind.DATA)), ioUtilsInstance);
     }
 
     @Override
@@ -702,15 +892,9 @@ public class TreeReaderFactory {
       stream.seek(index);
     }
 
-    @Override
-    public void nextVector(ColumnVector previousVector,
-                           boolean[] isNull,
-                           final int batchSize) throws IOException {
-      final DoubleColumnVector result = (DoubleColumnVector) previousVector;
-
-      // Read present/isNull stream
-      super.nextVector(result, isNull, batchSize);
-
+    private void nextVector(DoubleColumnVector result,
+                            boolean[] isNull,
+                            final int batchSize) throws IOException {
       final boolean hasNulls = !result.noNulls;
       boolean allNulls = hasNulls;
 
@@ -750,6 +934,74 @@ public class TreeReaderFactory {
           }
           result.isRepeating = repeating;
         }
+      }
+    }
+
+    private void nextVector(DoubleColumnVector result,
+                            boolean[] isNull,
+                            FilterContext filterContext,
+                            final int batchSize) throws IOException {
+      final boolean hasNulls = !result.noNulls;
+      boolean allNulls = hasNulls;
+      result.isRepeating = false;
+      int previousIdx = 0;
+
+      if (batchSize > 0) {
+        if (hasNulls) {
+          // conditions to ensure bounds checks skips
+          for (int i = 0; batchSize <= result.isNull.length && i < batchSize; i++) {
+            allNulls = allNulls & result.isNull[i];
+          }
+          if (allNulls) {
+            result.vector[0] = Double.NaN;
+            result.isRepeating = true;
+          } else {
+            // some nulls
+            // conditions to ensure bounds checks skips
+            for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+              int idx = filterContext.getSelected()[i];
+              if (idx - previousIdx > 0) {
+                utils.skipFloat(stream, countNonNullRowsInRange(result.isNull, previousIdx, idx), ioUtilsInstance);
+              }
+              if (!result.isNull[idx]) {
+                result.vector[idx] = utils.readFloat(stream);
+              } else {
+                // If the value is not present then set NaN
+                result.vector[idx] = Double.NaN;
+              }
+              previousIdx = idx + 1;
+            }
+            utils.skipFloat(stream, countNonNullRowsInRange(result.isNull, previousIdx, batchSize), ioUtilsInstance);
+          }
+        } else {
+          // Read only the selected row indexes and skip the rest
+          for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+            int idx = filterContext.getSelected()[i];
+            if (idx - previousIdx > 0) {
+              utils.skipFloat(stream,idx - previousIdx, ioUtilsInstance);
+            }
+            result.vector[idx] = utils.readFloat(stream);
+            previousIdx = idx + 1;
+          }
+          utils.skipFloat(stream,batchSize - previousIdx, ioUtilsInstance);
+        }
+      }
+
+    }
+
+    @Override
+    public void nextVector(ColumnVector previousVector,
+                           boolean[] isNull,
+                           final int batchSize) throws IOException {
+      final DoubleColumnVector result = (DoubleColumnVector) previousVector;
+
+      // Read present/isNull stream
+      super.nextVector(result, isNull, batchSize);
+
+      if (filterContext.isSelectedInUse()) {
+        nextVector(result, isNull, filterContext, batchSize);
+      } else {
+        nextVector(result, isNull, batchSize);
       }
     }
 
@@ -796,14 +1048,62 @@ public class TreeReaderFactory {
       stream.seek(index);
     }
 
-    @Override
-    public void nextVector(ColumnVector previousVector,
+    private void nextVector(DoubleColumnVector result,
+                            boolean[] isNull,
+                            FilterContext filterContext,
+                            final int batchSize) throws IOException {
+
+      final boolean hasNulls = !result.noNulls;
+      boolean allNulls = hasNulls;
+      result.isRepeating = false;
+      if (batchSize != 0) {
+        if (hasNulls) {
+          // conditions to ensure bounds checks skips
+          for (int i = 0; i < batchSize && batchSize <= result.isNull.length; i++) {
+            allNulls = allNulls & result.isNull[i];
+          }
+          if (allNulls) {
+            result.vector[0] = Double.NaN;
+            result.isRepeating = true;
+          } else {
+            // some nulls
+            int previousIdx = 0;
+            // conditions to ensure bounds checks skips
+            for (int i = 0; batchSize <= result.isNull.length && i != filterContext.getSelectedSize(); i++) {
+              int idx = filterContext.getSelected()[i];
+              if (idx - previousIdx > 0) {
+                utils.skipDouble(stream, countNonNullRowsInRange(result.isNull, previousIdx, idx), ioUtilsInstance);
+              }
+              if (!result.isNull[idx]) {
+                result.vector[idx] = utils.readDouble(stream);
+              } else {
+                // If the value is not present then set NaN
+                result.vector[idx] = Double.NaN;
+              }
+              previousIdx = idx + 1;
+            }
+            utils.skipDouble(stream, countNonNullRowsInRange(result.isNull, previousIdx, batchSize), ioUtilsInstance);
+          }
+        } else {
+          // no nulls
+          int previousIdx = 0;
+          // Read only the selected row indexes and skip the rest
+          for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+            int idx = filterContext.getSelected()[i];
+            if (idx - previousIdx > 0) {
+              utils.skipDouble(stream, idx - previousIdx, ioUtilsInstance);
+            }
+            result.vector[idx] = utils.readDouble(stream);
+            previousIdx = idx + 1;
+          }
+          utils.skipDouble(stream, batchSize - previousIdx, ioUtilsInstance);
+        }
+      }
+    }
+
+    private void nextVector(DoubleColumnVector result,
                            boolean[] isNull,
                            final int batchSize) throws IOException {
-      final DoubleColumnVector result = (DoubleColumnVector) previousVector;
-
-      // Read present/isNull stream
-      super.nextVector(result, isNull, batchSize);
 
       final boolean hasNulls = !result.noNulls;
       boolean allNulls = hasNulls;
@@ -843,6 +1143,22 @@ public class TreeReaderFactory {
           }
           result.isRepeating = repeating;
         }
+      }
+    }
+
+    @Override
+    public void nextVector(ColumnVector previousVector,
+        boolean[] isNull,
+        final int batchSize) throws IOException {
+      final DoubleColumnVector result = (DoubleColumnVector) previousVector;
+
+      // Read present/isNull stream
+      super.nextVector(result, isNull, batchSize);
+
+      if (filterContext.isSelectedInUse()) {
+        nextVector(result, isNull, filterContext, batchSize);
+      } else {
+        nextVector(result, isNull, batchSize);
       }
     }
 
@@ -1056,33 +1372,31 @@ public class TreeReaderFactory {
       nanos.seek(index);
     }
 
-    @Override
-    public void nextVector(ColumnVector previousVector,
+    public void readTimestamp(TimestampColumnVector result, int idx) throws IOException {
+      final int newNanos = parseNanos(nanos.next());
+      long millis = (data.next() + base_timestamp)
+          * TimestampTreeWriter.MILLIS_PER_SECOND + newNanos / 1_000_000;
+      if (millis < 0 && newNanos > 999_999) {
+        millis -= TimestampTreeWriter.MILLIS_PER_SECOND;
+      }
+      long offset = 0;
+      // If reader and writer time zones have different rules, adjust the timezone difference
+      // between reader and writer taking day light savings into account.
+      if (!hasSameTZRules) {
+        offset = SerializationUtils.convertBetweenTimezones(writerTimeZone,
+            readerTimeZone, millis);
+      }
+      result.time[idx] = millis + offset;
+      result.nanos[idx] = newNanos;
+    }
+
+    public void nextVector(TimestampColumnVector result,
                            boolean[] isNull,
                            final int batchSize) throws IOException {
-      TimestampColumnVector result = (TimestampColumnVector) previousVector;
-      result.changeCalendar(fileUsesProleptic, false);
-      super.nextVector(previousVector, isNull, batchSize);
-
-      result.setIsUTC(context.getUseUTCTimestamp());
 
       for (int i = 0; i < batchSize; i++) {
         if (result.noNulls || !result.isNull[i]) {
-          final int newNanos = parseNanos(nanos.next());
-          long millis = (data.next() + base_timestamp)
-              * TimestampTreeWriter.MILLIS_PER_SECOND + newNanos / 1_000_000;
-          if (millis < 0 && newNanos > 999_999) {
-            millis -= TimestampTreeWriter.MILLIS_PER_SECOND;
-          }
-          long offset = 0;
-          // If reader and writer time zones have different rules, adjust the timezone difference
-          // between reader and writer taking day light savings into account.
-          if (!hasSameTZRules) {
-            offset = SerializationUtils.convertBetweenTimezones(writerTimeZone,
-                readerTimeZone, millis);
-          }
-          result.time[i] = millis + offset;
-          result.nanos[i] = newNanos;
+          readTimestamp(result, i);
           if (result.isRepeating && i != 0 &&
               (result.time[0] != result.time[i] ||
                   result.nanos[0] != result.nanos[i])) {
@@ -1093,6 +1407,56 @@ public class TreeReaderFactory {
       result.changeCalendar(useProleptic, true);
     }
 
+    public void nextVector(TimestampColumnVector result,
+                           boolean[] isNull,
+                           FilterContext filterContext,
+                           final int batchSize) throws IOException {
+      result.isRepeating = false;
+      int previousIdx = 0;
+      if (result.noNulls) {
+        for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+          int idx = filterContext.getSelected()[i];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(idx - previousIdx);
+          }
+          readTimestamp(result, idx);
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(batchSize - previousIdx);
+      } else {
+        for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+          int idx = filterContext.getSelected()[i];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, idx));
+          }
+          if (!result.isNull[idx]) {
+            readTimestamp(result, idx);
+          }
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, batchSize));
+      }
+      result.changeCalendar(useProleptic, true);
+
+    }
+
+    @Override
+    public void nextVector(ColumnVector previousVector,
+                           boolean[] isNull,
+                           final int batchSize) throws IOException {
+      TimestampColumnVector result = (TimestampColumnVector) previousVector;
+      result.changeCalendar(fileUsesProleptic, false);
+      super.nextVector(previousVector, isNull, batchSize);
+
+      result.setIsUTC(context.getUseUTCTimestamp());
+
+      if (filterContext.isSelectedInUse()) {
+        nextVector(result, isNull, filterContext, batchSize);
+      } else {
+        nextVector(result, isNull, batchSize);
+      }
+    }
+
     private static int parseNanos(long serialized) {
       int zeros = 7 & (int) serialized;
       int result = (int) (serialized >>> 3);
@@ -1100,6 +1464,11 @@ public class TreeReaderFactory {
         result *= (int) powerOfTenTable[zeros + 1];
       }
       return result;
+    }
+
+    void skipStreamRows(long items) throws IOException {
+      data.skip(items);
+      nanos.skip(items);
     }
 
     @Override
@@ -1181,6 +1550,7 @@ public class TreeReaderFactory {
 
       // Read value entries based on isNull entries
       reader.nextVector(result, result.vector, batchSize);
+
       if (needsDateColumnVector) {
         ((DateColumnVector) result).changeCalendar(useProleptic, true);
       }
@@ -1295,6 +1665,60 @@ public class TreeReaderFactory {
       }
     }
 
+    private void nextVector(DecimalColumnVector result,
+                            boolean[] isNull,
+                            FilterContext filterContext,
+                            final int batchSize) throws IOException {
+      // Allocate space for the whole array
+      if (batchSize > scratchScaleVector.length) {
+        scratchScaleVector = new int[(int) batchSize];
+      }
+      // But read only read the scales that are needed
+      scaleReader.nextVector(result, scratchScaleVector, batchSize);
+      // Read value entries based on isNull entries
+      // Use the fast ORC deserialization method that emulates SerializationUtils.readBigInteger
+      // provided by HiveDecimalWritable.
+      HiveDecimalWritable[] vector = result.vector;
+      HiveDecimalWritable decWritable;
+      if (result.noNulls) {
+        int previousIdx = 0;
+        for (int r=0; r != filterContext.getSelectedSize(); ++r) {
+          int idx = filterContext.getSelected()[r];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(idx - previousIdx);
+          }
+          decWritable = vector[idx];
+          if (!decWritable.serializationUtilsRead(
+              valueStream, scratchScaleVector[idx],
+              scratchBytes)) {
+            result.isNull[idx] = true;
+            result.noNulls = false;
+          }
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(batchSize - previousIdx);
+      } else if (!result.isRepeating || !result.isNull[0]) {
+        int previousIdx = 0;
+        for (int r=0; r != filterContext.getSelectedSize(); ++r) {
+          int idx = filterContext.getSelected()[r];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, idx));
+          }
+          if (!result.isNull[r]) {
+            decWritable = vector[idx];
+            if (!decWritable.serializationUtilsRead(
+                valueStream, scratchScaleVector[idx],
+                scratchBytes)) {
+              result.isNull[idx] = true;
+              result.noNulls = false;
+            }
+          }
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, batchSize));
+      }
+    }
+
     private void nextVector(Decimal64ColumnVector result,
                             boolean[] isNull,
                             final int batchSize) throws IOException {
@@ -1325,6 +1749,55 @@ public class TreeReaderFactory {
       result.scale = (short) scale;
     }
 
+    private void nextVector(Decimal64ColumnVector result,
+        boolean[] isNull,
+        FilterContext filterContext,
+        final int batchSize) throws IOException {
+      if (precision > TypeDescription.MAX_DECIMAL64_PRECISION) {
+        throw new IllegalArgumentException("Reading large precision type into" +
+            " Decimal64ColumnVector.");
+      }
+      // Allocate space for the whole array
+      if (batchSize > scratchScaleVector.length) {
+        scratchScaleVector = new int[(int) batchSize];
+      }
+      // Read all the scales
+      scaleReader.nextVector(result, scratchScaleVector, batchSize);
+      if (result.noNulls) {
+        int previousIdx = 0;
+        for (int r=0; r != filterContext.currBatchSelectedSize; r++) {
+          int idx = filterContext.getSelected()[r];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(idx - previousIdx);
+          }
+          result.vector[idx] = SerializationUtils.readVslong(valueStream);
+          for (int s=scratchScaleVector[idx]; s < scale; ++s) {
+            result.vector[idx] *= 10;
+          }
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(batchSize - previousIdx);
+      } else if (!result.isRepeating || !result.isNull[0]) {
+        int previousIdx = 0;
+        for (int r=0; r != filterContext.currBatchSelectedSize; r++) {
+          int idx = filterContext.getSelected()[r];
+          if (idx - previousIdx > 0) {
+            skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, idx));
+          }
+          if (!result.isNull[idx]) {
+            result.vector[idx] = SerializationUtils.readVslong(valueStream);
+            for (int s=scratchScaleVector[idx]; s < scale; ++s) {
+              result.vector[idx] *= 10;
+            }
+          }
+          previousIdx = idx + 1;
+        }
+        skipStreamRows(countNonNullRowsInRange(result.isNull, previousIdx, batchSize));
+      }
+      result.precision = (short) precision;
+      result.scale = (short) scale;
+    }
+
     @Override
     public void nextVector(ColumnVector result,
                            boolean[] isNull,
@@ -1332,9 +1805,29 @@ public class TreeReaderFactory {
       // Read present/isNull stream
       super.nextVector(result, isNull, batchSize);
       if (result instanceof Decimal64ColumnVector) {
-        nextVector((Decimal64ColumnVector) result, isNull, batchSize);
+         if (filterContext.isSelectedInUse()) {
+           nextVector((Decimal64ColumnVector) result, isNull, filterContext, batchSize);
+         } else {
+           nextVector((Decimal64ColumnVector) result, isNull, batchSize);
+         }
       } else {
-        nextVector((DecimalColumnVector) result, isNull, batchSize);
+        if (filterContext.isSelectedInUse()) {
+          nextVector((DecimalColumnVector) result, isNull, filterContext, batchSize);
+        } else {
+          nextVector((DecimalColumnVector) result, isNull, batchSize);
+        }
+      }
+    }
+
+    void skipStreamRows(long items) throws IOException {
+      for (int i = 0; i < items; i++) {
+        int input;
+        do {
+          input = valueStream.read();
+          if (input == -1) {
+            throw new EOFException("Reading BigInteger past EOF from " + valueStream);
+          }
+        } while(input >= 128);
       }
     }
 
@@ -1405,23 +1898,52 @@ public class TreeReaderFactory {
     }
 
     private void nextVector(DecimalColumnVector result,
+                            FilterContext filterContext,
                             final int batchSize) throws IOException {
       if (result.noNulls) {
-        for (int r=0; r < batchSize; ++r) {
-          result.vector[r].setFromLongAndScale(valueReader.next(), scale);
-        }
-      } else if (!result.isRepeating || !result.isNull[0]) {
-        for (int r=0; r < batchSize; ++r) {
-          if (result.noNulls || !result.isNull[r]) {
+        if (filterContext.isSelectedInUse()) {
+          int previousIdx = 0;
+          for (int r = 0; r != filterContext.getSelectedSize(); ++r) {
+            int idx = filterContext.getSelected()[r];
+            if (idx - previousIdx > 0) {
+              valueReader.skip(idx - previousIdx);
+            }
+            result.vector[idx].setFromLongAndScale(valueReader.next(), scale);
+            previousIdx = idx + 1;
+          }
+          valueReader.skip(batchSize - previousIdx);
+        } else {
+          for (int r = 0; r < batchSize; ++r) {
             result.vector[r].setFromLongAndScale(valueReader.next(), scale);
           }
         }
+      } else if (!result.isRepeating || !result.isNull[0]) {
+        if (filterContext.isSelectedInUse()) {
+          int previousIdx = 0;
+          for (int r = 0; r != filterContext.getSelectedSize(); ++r) {
+            int idx = filterContext.getSelected()[r];
+            if (idx - previousIdx > 0) {
+              valueReader.skip(countNonNullRowsInRange(result.isNull, previousIdx, idx));
+            }
+            if (!result.isNull[r])
+              result.vector[idx].setFromLongAndScale(valueReader.next(), scale);
+            previousIdx = idx + 1;
+          }
+          valueReader.skip(countNonNullRowsInRange(result.isNull, previousIdx, batchSize));
+        } else {
+            for (int r = 0; r < batchSize; ++r) {
+              if (!result.isNull[r]) {
+                result.vector[r].setFromLongAndScale(valueReader.next(), scale);
+              }
+            }
+          }
       }
       result.precision = (short) precision;
       result.scale = (short) scale;
     }
 
     private void nextVector(Decimal64ColumnVector result,
+                            FilterContext filterContext,
                             final int batchSize) throws IOException {
       valueReader.nextVector(result, result.vector, batchSize);
       result.precision = (short) precision;
@@ -1435,9 +1957,9 @@ public class TreeReaderFactory {
       // Read present/isNull stream
       super.nextVector(result, isNull, batchSize);
       if (result instanceof Decimal64ColumnVector) {
-        nextVector((Decimal64ColumnVector) result, batchSize);
+          nextVector((Decimal64ColumnVector) result, filterContext, batchSize);
       } else {
-        nextVector((DecimalColumnVector) result, batchSize);
+          nextVector((DecimalColumnVector) result, filterContext, batchSize);
       }
     }
 
@@ -1521,6 +2043,7 @@ public class TreeReaderFactory {
     public void nextVector(ColumnVector previousVector,
                            boolean[] isNull,
                            final int batchSize) throws IOException {
+      reader.filterContext = this.filterContext;
       reader.nextVector(previousVector, isNull, batchSize);
     }
 
@@ -1579,8 +2102,8 @@ public class TreeReaderFactory {
                                          BytesColumnVector result,
                                          final int batchSize) throws IOException {
       if (result.noNulls || !(result.isRepeating && result.isNull[0])) {
-        byte[] allBytes = commonReadByteArrays(stream, lengths, scratchlcv,
-            result, (int) batchSize);
+        byte[] allBytes =
+            commonReadByteArrays(stream, lengths, scratchlcv, result, (int) batchSize);
 
         // Too expensive to figure out 'repeating' by comparisons.
         result.isRepeating = false;
@@ -1817,11 +2340,15 @@ public class TreeReaderFactory {
                            boolean[] isNull,
                            final int batchSize) throws IOException {
       final BytesColumnVector result = (BytesColumnVector) previousVector;
-      int offset;
-      int length;
 
       // Read present/isNull stream
       super.nextVector(result, isNull, batchSize);
+      readDictionaryByteArray(result, filterContext, batchSize);
+    }
+
+    private void readDictionaryByteArray(BytesColumnVector result, FilterContext filterContext, int batchSize) throws IOException {
+      int offset;
+      int length;
 
       if (dictionaryBuffer != null) {
 
@@ -1837,17 +2364,31 @@ public class TreeReaderFactory {
         scratchlcv.ensureSize((int) batchSize, false);
         reader.nextVector(scratchlcv, scratchlcv.vector, batchSize);
         if (!scratchlcv.isRepeating) {
-
           // The vector has non-repeating strings. Iterate thru the batch
           // and set strings one by one
-          for (int i = 0; i < batchSize; i++) {
-            if (!scratchlcv.isNull[i]) {
-              offset = dictionaryOffsets[(int) scratchlcv.vector[i]];
-              length = getDictionaryEntryLength((int) scratchlcv.vector[i], offset);
-              result.setRef(i, dictionaryBufferInBytesCache, offset, length);
-            } else {
-              // If the value is null then set offset and length to zero (null string)
+          if (filterContext.isSelectedInUse()) {
+            // Set all string values to null - offset and length is zero
+            for (int i = 0; i < batchSize; i++)
               result.setRef(i, dictionaryBufferInBytesCache, 0, 0);
+            // Read selected rows from stream
+            for (int i = 0; i != filterContext.getSelectedSize(); i++) {
+              int idx = filterContext.getSelected()[i];
+              if (!scratchlcv.isNull[idx]) {
+                offset = dictionaryOffsets[(int) scratchlcv.vector[idx]];
+                length = getDictionaryEntryLength((int) scratchlcv.vector[idx], offset);
+                result.setRef(idx, dictionaryBufferInBytesCache, offset, length);
+              }
+            }
+          } else {
+            for (int i = 0; i < batchSize; i++) {
+              if (!scratchlcv.isNull[i]) {
+                offset = dictionaryOffsets[(int) scratchlcv.vector[i]];
+                length = getDictionaryEntryLength((int) scratchlcv.vector[i], offset);
+                result.setRef(i, dictionaryBufferInBytesCache, offset, length);
+              } else {
+                // If the value is null then set offset and length to zero (null string)
+                result.setRef(i, dictionaryBufferInBytesCache, 0, 0);
+              }
             }
           }
         } else {
@@ -2051,16 +2592,49 @@ public class TreeReaderFactory {
       }
     }
 
+    public void readBatchColumn(VectorizedRowBatch batch,  int batchSize, int index)
+        throws IOException {
+      ColumnVector colVector = batch.cols[index];
+      if (colVector != null) {
+        colVector.reset();
+        colVector.ensureSize(batchSize, false);
+//        System.out.println("Field: " + fields[index].columnId + " " + fields[index] + " BS "+ batchSize);
+        // Set the appropriate context to the subReaders (filter was applied after the previous method call)
+        fields[index].filterContext = this.filterContext;
+        fields[index].nextVector(colVector, null, batchSize);
+      }
+    }
+
     @Override
     public void nextBatch(VectorizedRowBatch batch,
                           int batchSize) throws IOException {
-      for(int i=0; i < fields.length &&
+
+      // Early expand fields --> apply filter --> expand remaining fields
+      Set<Integer> earlyExpandCols = this.context.getColumnFilterIds();
+
+      // Early expand columns used in Filter
+      for (int i=0; i < fields.length && !earlyExpandCols.isEmpty() &&
           (vectorColumnCount == -1 || i < vectorColumnCount); ++i) {
-        ColumnVector colVector = batch.cols[i];
-        if (colVector != null) {
-          colVector.reset();
-          colVector.ensureSize((int) batchSize, false);
-          fields[i].nextVector(colVector, null, batchSize);
+          if (earlyExpandCols.contains(fields[i].columnId)) {
+            readBatchColumn(batch, batchSize, i);
+          }
+      }
+      // VectorBatchSize is set by the RecordReaderImpl at the end of evert nextBatch call
+      // Since we are going to filter rows based on some column values set it earlier here
+      batch.size = batchSize;
+
+      // Apply filter callback to reduce number of # rows selected for decoding in the next TreeReaders
+      if (!earlyExpandCols.isEmpty() && this.context.getColumnFilterCallback() != null) {
+        this.context.getColumnFilterCallback().accept(batch);
+        mutableFilterContext.setFilterContext(batch.selectedInUse, batch.selected, batch.size);
+        this.filterContext = mutableFilterContext.immutable();
+      }
+
+      // Read the remaining columns applying row-level filtering
+      for (int i=0; i < fields.length &&
+          (vectorColumnCount == -1 || i < vectorColumnCount); ++i) {
+        if (!earlyExpandCols.contains(fields[i].columnId)) {
+          readBatchColumn(batch, batchSize, i);
         }
       }
     }
@@ -2078,6 +2652,7 @@ public class TreeReaderFactory {
         boolean[] mask = result.noNulls ? null : result.isNull;
         for (int f = 0; f < fields.length; f++) {
           if (fields[f] != null) {
+            fields[f].filterContext = this.filterContext;
             fields[f].nextVector(result.fields[f], mask, batchSize);
           }
         }
@@ -2168,7 +2743,7 @@ public class TreeReaderFactory {
     void startStripe(StripePlanner planner) throws IOException {
       super.startStripe(planner);
       tags = new RunLengthByteReader(planner.getStream(new StreamName(columnId,
-          OrcProto.Stream.Kind.DATA)));
+          OrcProto.Stream.Kind.DATA)), ioUtilsInstance);
       for (TreeReader field : fields) {
         if (field != null) {
           field.startStripe(planner);

@@ -83,7 +83,8 @@ public class TestColumnStatisticsImpl {
     TimestampColumnStatistics stats =
         (TimestampColumnStatistics) reader.getStatistics()[0];
     assertEquals("1995-01-01 00:00:00.688", stats.getMinimum().toString());
-    assertEquals("2037-01-01 00:00:00.0", stats.getMaximum().toString());
+    // ORC-611 update: TS stats nanosecond support (max + 1 ms)
+    assertEquals("2037-01-01 00:00:00.001", stats.getMaximum().toString());
     TimeZone.setDefault(original);
   }
 

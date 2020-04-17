@@ -20,6 +20,7 @@ package org.apache.orc;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.vector.Decimal64ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
@@ -124,36 +125,36 @@ public class TestRowFilteringComplexTypes {
 
 
     @Test
-    // Inner UNION should NOT make use of the filterContext
+    // Inner UNION should make use of the filterContext
     // TODO: selected rows should be combined with ignored rows
     public void testInnerUnionRowFilter() throws Exception {
         // Set the row stride to a multiple of the batch size
         final int INDEX_STRIDE = 16 * ColumnBatchRows;
-        final int NUM_BATCHES = 1;
+        final int NUM_BATCHES = 2;
 
-        TypeDescription schema = TypeDescription.createStruct()
-                .addField("int1", TypeDescription.createInt())
-                .addField("innerUnion", TypeDescription.createUnion()
-                        .addUnionChild(TypeDescription.createDecimal())
-                        .addUnionChild(TypeDescription.createDecimal())
-                );
+        TypeDescription schema = TypeDescription.fromString(
+            "struct<int1:int,innerUnion:uniontype<decimal(16,3),decimal(16,3)>>");
 
         try (Writer writer = OrcFile.createWriter(testFilePath,
                 OrcFile.writerOptions(conf).setSchema(schema).rowIndexStride(INDEX_STRIDE))) {
             VectorizedRowBatch batch = schema.createRowBatchV2();
             LongColumnVector col1 = (LongColumnVector) batch.cols[0];
             UnionColumnVector col2 = (UnionColumnVector) batch.cols[1];
-            DecimalColumnVector innerCol1 = (DecimalColumnVector) col2.fields[0];
-            DecimalColumnVector innerCol2 = (DecimalColumnVector) col2.fields[1];
+            Decimal64ColumnVector innerCol1 = (Decimal64ColumnVector) col2.fields[0];
+            Decimal64ColumnVector innerCol2 = (Decimal64ColumnVector) col2.fields[1];
 
             for (int b = 0; b < NUM_BATCHES; ++b) {
                 batch.reset();
                 batch.size = ColumnBatchRows;
                 for (int row = 0; row < batch.size; row++) {
-                    col1.vector[row] = row;
-                    col2.tags[row] = row % 2;
-                    innerCol1.vector[row] = new HiveDecimalWritable(row);
-                    innerCol2.vector[row] = new HiveDecimalWritable(row * 2);
+                    int totalRow = ColumnBatchRows * b + row;
+                    col1.vector[row] = totalRow;
+                    col2.tags[row] = totalRow % 2;
+                    if (col2.tags[row] == 0) {
+                      innerCol1.vector[row] = totalRow * 1000;
+                    } else {
+                      innerCol2.vector[row] = totalRow * 3 * 1000;
+                    }
                 }
                 col1.isRepeating = false;
                 writer.addRowBatch(batch);
@@ -166,24 +167,27 @@ public class TestRowFilteringComplexTypes {
             VectorizedRowBatch batch = reader.getSchema().createRowBatchV2();
             LongColumnVector col1 = (LongColumnVector) batch.cols[0];
             UnionColumnVector col2 = (UnionColumnVector) batch.cols[1];
+            Decimal64ColumnVector innerCol1 = (Decimal64ColumnVector) col2.fields[0];
+            Decimal64ColumnVector innerCol2 = (Decimal64ColumnVector) col2.fields[1];
 
-            int noNullCnt = 0;
+            int previousRows = 0;
             while (rows.nextBatch(batch)) {
                 Assert.assertTrue(batch.selectedInUse);
-                for (int r = 0; r < ColumnBatchRows; ++r) {
-                    StringBuilder sb = new StringBuilder();
-                    col2.stringifyValue(sb, r);
-                    if (sb.toString().equals("{\"tag\": " + (r % 2) + ", \"value\": " +
-                            (r % 2 == 0 ? r : 2 * r) + "}")) {
-                        noNullCnt++;
-                    }
+                Assert.assertEquals(ColumnBatchRows / 2, batch.size);
+                for (int r = 0; r < batch.size; ++r) {
+                    int row = batch.selected[r];
+                    int originalRow = (r + previousRows) * 2;
+                    Assert.assertEquals("row " + originalRow, originalRow, col1.vector[row]);
+                    Assert.assertEquals("row " + originalRow, 0, col2.tags[row]);
+                    Assert.assertEquals("row " + originalRow,
+                        originalRow * 1000, innerCol1.vector[row]);
                 }
+                // check to make sure that we didn't read innerCol2
+                for(int r = 1; r < ColumnBatchRows; r += 2) {
+                    Assert.assertEquals("row " + r, 0, innerCol2.vector[r]);
+                }
+                previousRows += batch.size;
             }
-            // Make sure that we did NOT skip any rows
-            Assert.assertEquals(NUM_BATCHES * ColumnBatchRows, noNullCnt);
-            // Even though selected Array is still used its not propagated
-            Assert.assertEquals(0, batch.selected[0]);
-            Assert.assertEquals(2, batch.selected[1]);
         }
     }
 

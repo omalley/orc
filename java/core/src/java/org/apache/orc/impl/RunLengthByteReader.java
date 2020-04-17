@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -30,16 +30,14 @@ import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
  */
 public class RunLengthByteReader {
   private InStream input;
-  private IOUtils ioUtilsInstance;
   private final byte[] literals =
     new byte[RunLengthByteWriter.MAX_LITERAL_SIZE];
   private int numLiterals = 0;
   private int used = 0;
   private boolean repeat = false;
 
-  public RunLengthByteReader(InStream input, IOUtils ioUtilsInstance) {
+  public RunLengthByteReader(InStream input) {
     this.input = input;
-    this.ioUtilsInstance = ioUtilsInstance;
   }
 
   public void setInStream(InStream input) {
@@ -54,12 +52,11 @@ public class RunLengthByteReader {
         throw new EOFException("Read past end of buffer RLE byte from " + input);
       }
       used = numLiterals = 0;
-      return;
     } else if (control < 0x80) {
       repeat = true;
       numLiterals = control + RunLengthByteWriter.MIN_REPEAT_SIZE;
       if (numSkipRows >= numLiterals) {
-        ioUtilsInstance.skipFully(input,1);
+        IOUtils.skipFully(input,1);
       } else {
         int val = input.read();
         if (val == -1) {
@@ -72,7 +69,7 @@ public class RunLengthByteReader {
       numLiterals = 0x100 - control;
       numSkipRows = Math.min(numSkipRows, numLiterals);
       if (numSkipRows > 0) {
-        ioUtilsInstance.skipFully(input, numSkipRows);
+        IOUtils.skipFully(input, numSkipRows);
       }
       int bytes = numSkipRows;
       while (bytes < numLiterals) {

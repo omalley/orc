@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +17,7 @@
  */
 package org.apache.orc.impl;
 
+import org.apache.hadoop.hive.ql.io.filter.FilterContext;
 import java.io.EOFException;
 import java.io.IOException;
 
@@ -28,8 +29,8 @@ public final class BitFieldReader {
   private int current;
   private byte currentIdx = 8;
 
-  public BitFieldReader(InStream input, IOUtils ioUtilsInstance) {
-    this.input = new RunLengthByteReader(input, ioUtilsInstance);
+  public BitFieldReader(InStream input) {
+    this.input = new RunLengthByteReader(input);
   }
 
   private void readByte() throws IOException {
@@ -52,7 +53,7 @@ public final class BitFieldReader {
   }
 
   public void nextVector(LongColumnVector previous,
-                         TreeReaderFactory.FilterContext filterContext,
+                         FilterContext filterContext,
                          long previousLen) throws IOException {
     previous.isRepeating = false;
     int previousIdx = 0;

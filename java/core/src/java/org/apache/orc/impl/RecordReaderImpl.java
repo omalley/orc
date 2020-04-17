@@ -1174,19 +1174,11 @@ public class RecordReaderImpl implements RecordReader {
       }
 
       int batchSize = computeBatchSize(batch.getMaxSize());
+      batch.size = batchSize;
 
       rowInStripe += batchSize;
       reader.setVectorColumnCount(batch.getDataColumnCount());
-      reader.filterContext.resetFilterContext();
       reader.nextBatch(batch, batchSize);
-      if (reader.filterContext.isSelectedInUse()) {
-        batch.selectedInUse = true;
-        batch.size = reader.filterContext.getSelectedSize();
-        batch.selected = reader.filterContext.getSelected();
-      } else {
-        batch.selectedInUse = false;
-        batch.size = batchSize;
-      }
       advanceToNextRow(reader, rowInStripe + rowBaseInStripe, true);
       return batchSize != 0;
     } catch (IOException e) {

@@ -116,6 +116,8 @@ public class Driver {
       ConvertTool.main(conf, options.commandArgs);
     } else if ("key".equals(options.command)) {
       KeyTool.main(conf, options.commandArgs);
+    } else if ("count".equals(options.command)) {
+      RowCount.main(conf, options.commandArgs);
     } else {
       System.err.println("Unknown subcommand: " + options.command);
       System.exit(1);

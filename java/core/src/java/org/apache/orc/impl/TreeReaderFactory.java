@@ -1438,7 +1438,7 @@ public class TreeReaderFactory {
    * dictionary encoding was used.
    */
   public static class StringTreeReader extends TreeReader {
-    protected TreeReader reader;
+    protected TypeReader reader;
 
     StringTreeReader(int columnId, Context context) throws IOException {
       super(columnId, context);
@@ -1995,7 +1995,7 @@ public class TreeReaderFactory {
   }
 
   public static class StructTreeReader extends TreeReader {
-    public final TreeReader[] fields;
+    public final TypeReader[] fields;
 
     protected StructTreeReader(int columnId,
                                TypeDescription readerSchema,
@@ -2010,14 +2010,14 @@ public class TreeReaderFactory {
       }
     }
 
-    public TreeReader[] getChildReaders() {
+    public TypeReader[] getChildReaders() {
       return fields;
     }
 
     protected StructTreeReader(int columnId, InStream present,
                                Context context,
                                OrcProto.ColumnEncoding encoding,
-                               TreeReader[] childReaders) throws IOException {
+                               TypeReader[] childReaders) throws IOException {
       super(columnId, present, context);
       if (encoding != null) {
         checkEncoding(encoding);
@@ -2028,7 +2028,7 @@ public class TreeReaderFactory {
     @Override
     public void seek(PositionProvider[] index) throws IOException {
       super.seek(index);
-      for (TreeReader kid : fields) {
+      for (TypeReader kid : fields) {
         if (kid != null) {
           kid.seek(index);
         }
@@ -2057,7 +2057,7 @@ public class TreeReaderFactory {
     @Override
     public void startStripe(StripePlanner planner) throws IOException {
       super.startStripe(planner);
-      for (TreeReader field : fields) {
+      for (TypeReader field : fields) {
         if (field != null) {
           field.startStripe(planner);
         }
@@ -2067,7 +2067,7 @@ public class TreeReaderFactory {
     @Override
     public void skipRows(long items) throws IOException {
       items = countNonNulls(items);
-      for (TreeReader field : fields) {
+      for (TypeReader field : fields) {
         if (field != null) {
           field.skipRows(items);
         }
@@ -2076,7 +2076,7 @@ public class TreeReaderFactory {
   }
 
   public static class UnionTreeReader extends TreeReader {
-    protected final TreeReader[] fields;
+    protected final TypeReader[] fields;
     protected RunLengthByteReader tags;
 
     protected UnionTreeReader(int fileColumn,
@@ -2095,7 +2095,7 @@ public class TreeReaderFactory {
     protected UnionTreeReader(int columnId, InStream present,
                               Context context,
                               OrcProto.ColumnEncoding encoding,
-                              TreeReader[] childReaders) throws IOException {
+                              TypeReader[] childReaders) throws IOException {
       super(columnId, present, context);
       if (encoding != null) {
         checkEncoding(encoding);
@@ -2107,7 +2107,7 @@ public class TreeReaderFactory {
     public void seek(PositionProvider[] index) throws IOException {
       super.seek(index);
       tags.seek(index[columnId]);
-      for (TreeReader kid : fields) {
+      for (TypeReader kid : fields) {
         kid.seek(index);
       }
     }
@@ -2139,7 +2139,7 @@ public class TreeReaderFactory {
       super.startStripe(planner);
       tags = new RunLengthByteReader(planner.getStream(new StreamName(columnId,
           OrcProto.Stream.Kind.DATA)));
-      for (TreeReader field : fields) {
+      for (TypeReader field : fields) {
         if (field != null) {
           field.startStripe(planner);
         }
@@ -2160,7 +2160,7 @@ public class TreeReaderFactory {
   }
 
   public static class ListTreeReader extends TreeReader {
-    protected final TreeReader elementReader;
+    protected final TypeReader elementReader;
     protected IntegerReader lengths = null;
 
     protected ListTreeReader(int fileColumn,
@@ -2176,7 +2176,7 @@ public class TreeReaderFactory {
                              Context context,
                              InStream data,
                              OrcProto.ColumnEncoding encoding,
-                             TreeReader elementReader) throws IOException {
+                             TypeReader elementReader) throws IOException {
       super(columnId, present, context);
       if (data != null && encoding != null) {
         checkEncoding(encoding);
@@ -2248,8 +2248,8 @@ public class TreeReaderFactory {
   }
 
   public static class MapTreeReader extends TreeReader {
-    protected final TreeReader keyReader;
-    protected final TreeReader valueReader;
+    protected final TypeReader keyReader;
+    protected final TypeReader valueReader;
     protected IntegerReader lengths = null;
 
     protected MapTreeReader(int fileColumn,
@@ -2267,8 +2267,8 @@ public class TreeReaderFactory {
                             Context context,
                             InStream data,
                             OrcProto.ColumnEncoding encoding,
-                            TreeReader keyReader,
-                            TreeReader valueReader) throws IOException {
+                            TypeReader keyReader,
+                            TypeReader valueReader) throws IOException {
       super(columnId, present, context);
       if (data != null && encoding != null) {
         checkEncoding(encoding);
@@ -2346,7 +2346,7 @@ public class TreeReaderFactory {
     }
   }
 
-  public static TreeReader createTreeReader(TypeDescription readerType,
+  public static TypeReader createTreeReader(TypeDescription readerType,
                                             Context context
                                             ) throws IOException {
     OrcFile.Version version = context.getFileFormat();
@@ -2419,7 +2419,7 @@ public class TreeReaderFactory {
 
   public static BatchReader createRootReader(TypeDescription readerType, Context context)
           throws IOException {
-    TreeReader reader = createTreeReader(readerType, context);
+    TypeReader reader = createTreeReader(readerType, context);
     if (reader instanceof StructTreeReader) {
       return new StructBatchReader((StructTreeReader) reader);
     } else {

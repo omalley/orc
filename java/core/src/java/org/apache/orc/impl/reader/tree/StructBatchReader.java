@@ -31,7 +31,7 @@ public class StructBatchReader extends BatchReader {
 
   @Override
   public void nextBatch(VectorizedRowBatch batch, int batchSize) throws IOException {
-    TreeReaderFactory.TreeReader[] children = ((TreeReaderFactory.StructTreeReader) rootType).fields;
+    TypeReader[] children = ((TreeReaderFactory.StructTreeReader) rootType).fields;
     for (int i = 0; i < children.length &&
                     (vectorColumnCount == -1 || i < vectorColumnCount); ++i) {
       ColumnVector colVector = batch.cols[i];

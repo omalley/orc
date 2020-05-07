@@ -19,21 +19,13 @@ package org.apache.orc.impl.reader.tree;
 
 import java.io.IOException;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.orc.impl.TreeReaderFactory;
 
 public class PrimitiveBatchReader extends BatchReader {
 
-  public PrimitiveBatchReader(TreeReaderFactory.TreeReader rowReader) {
+  public PrimitiveBatchReader(TypeReader rowReader) {
     super(rowReader);
   }
 
-  /**
-   * Handle an elementary type
-   *
-   * @param batch     the batch to read into
-   * @param batchSize the number of rows to read
-   * @throws IOException
-   */
   @Override
   public void nextBatch(VectorizedRowBatch batch,
                         int batchSize) throws IOException {

@@ -25,7 +25,8 @@ import java.io.IOException;
 
 
 /**
- * The class that implements reading the file into VectorizedRowBatches.
+ * The top level interface that the reader uses to read the columns from the
+ * ORC file.
  */
 public abstract class BatchReader {
   // The row type reader

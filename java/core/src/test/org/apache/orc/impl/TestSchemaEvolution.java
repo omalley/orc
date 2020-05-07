@@ -55,6 +55,7 @@ import org.apache.orc.impl.reader.ReaderEncryption;
 import org.apache.orc.impl.reader.StripePlanner;
 import org.apache.orc.impl.reader.tree.BatchReader;
 import org.apache.orc.impl.reader.tree.StructBatchReader;
+import org.apache.orc.impl.reader.tree.TypeReader;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -1649,7 +1650,7 @@ public class TestSchemaEvolution {
     // check to make sure the tree reader is built right
     assertEquals(StructBatchReader.class, reader.getClass());
     assertEquals(TreeReaderFactory.StructTreeReader.class, reader.rootType.getClass());
-    TreeReaderFactory.TreeReader[] children =
+    TypeReader[] children =
         ((TreeReaderFactory.StructTreeReader) reader.rootType).getChildReaders();
     assertEquals(3, children.length);
     assertEquals(TreeReaderFactory.NullTreeReader.class, children[0].getClass());
@@ -1697,12 +1698,12 @@ public class TestSchemaEvolution {
 
     TreeReaderFactory.Context treeContext =
         new TreeReaderFactory.ReaderContext().setSchemaEvolution(evo);
-    TreeReaderFactory.TreeReader reader =
+    TypeReader reader =
         TreeReaderFactory.createTreeReader(readType, treeContext);
 
     // check to make sure the tree reader is built right
     assertEquals(TreeReaderFactory.StructTreeReader.class, reader.getClass());
-    TreeReaderFactory.TreeReader[] children =
+    TypeReader[] children =
         ((TreeReaderFactory.StructTreeReader) reader).getChildReaders();
     assertEquals(2, children.length);
     assertEquals(TreeReaderFactory.IntTreeReader.class, children[0].getClass());

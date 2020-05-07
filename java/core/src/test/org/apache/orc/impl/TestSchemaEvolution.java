@@ -1643,7 +1643,7 @@ public class TestSchemaEvolution {
 
     TreeReaderFactory.Context treeContext =
         new TreeReaderFactory.ReaderContext().setSchemaEvolution(evo);
-    BatchReader<?> reader =
+    BatchReader reader =
         TreeReaderFactory.createRootReader(readType, treeContext);
 
     // check to make sure the tree reader is built right

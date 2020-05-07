@@ -17,30 +17,29 @@
  */
 package org.apache.orc.impl.reader.tree;
 
-import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
+import java.io.IOException;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.orc.impl.TreeReaderFactory;
 
-import java.io.IOException;
+public class PrimitiveBatchReader extends BatchReader {
 
-public class StructBatchReader extends BatchReader {
-
-  public StructBatchReader(TreeReaderFactory.StructTreeReader rowReader) {
+  public PrimitiveBatchReader(TreeReaderFactory.TreeReader rowReader) {
     super(rowReader);
   }
 
+  /**
+   * Handle an elementary type
+   *
+   * @param batch     the batch to read into
+   * @param batchSize the number of rows to read
+   * @throws IOException
+   */
   @Override
-  public void nextBatch(VectorizedRowBatch batch, int batchSize) throws IOException {
-    TreeReaderFactory.TreeReader[] children = ((TreeReaderFactory.StructTreeReader) rootType).fields;
-    for (int i = 0; i < children.length &&
-                    (vectorColumnCount == -1 || i < vectorColumnCount); ++i) {
-      ColumnVector colVector = batch.cols[i];
-      if (colVector != null) {
-        colVector.reset();
-        colVector.ensureSize(batchSize, false);
-        children[i].nextVector(colVector, null, batchSize);
-      }
-    }
-    resetBatch(batch, batchSize);
+  public void nextBatch(VectorizedRowBatch batch,
+                        int batchSize) throws IOException {
+  batch.cols[0].reset();
+  batch.cols[0].ensureSize(batchSize, false);
+  rootType.nextVector(batch.cols[0], null, batchSize);
+  resetBatch(batch, batchSize);
   }
 }

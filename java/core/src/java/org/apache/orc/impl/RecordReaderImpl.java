@@ -79,7 +79,7 @@ public class RecordReaderImpl implements RecordReader {
   private int currentStripe = -1;
   private long rowBaseInStripe = 0;
   private long rowCountInStripe = 0;
-  private final BatchReader<?> reader;
+  private final BatchReader reader;
   private final OrcIndex indexes;
   private final SargApplier sargApp;
   // an array about which row groups aren't skipped
@@ -1109,7 +1109,7 @@ public class RecordReaderImpl implements RecordReader {
    * @throws IOException
    */
   private boolean advanceToNextRow(
-    BatchReader<?> reader, long nextRow, boolean canAdvanceStripe)
+    BatchReader reader, long nextRow, boolean canAdvanceStripe)
       throws IOException {
     long nextRowInStripe = nextRow - rowBaseInStripe;
     // check for row skipping
@@ -1259,7 +1259,7 @@ public class RecordReaderImpl implements RecordReader {
     }
   }
 
-  private void seekToRowEntry(BatchReader<?> reader, int rowEntry)
+  private void seekToRowEntry(BatchReader reader, int rowEntry)
       throws IOException {
     OrcProto.RowIndex[] rowIndices = indexes.getRowGroupIndex();
     PositionProvider[] index = new PositionProvider[rowIndices.length];

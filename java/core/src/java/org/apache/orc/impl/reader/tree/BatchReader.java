@@ -23,13 +23,17 @@ import org.apache.orc.impl.reader.StripePlanner;
 
 import java.io.IOException;
 
-public class BatchReader<T extends TypeReader> {
+
+/**
+ *
+ */
+public abstract class BatchReader {
   // The row type reader
-  public final T rootType;
+  public final TypeReader rootType;
 
   protected int vectorColumnCount = -1;
 
-  public BatchReader(T rootType) {
+  public BatchReader(TypeReader rootType) {
     this.rootType = rootType;
   }
 
@@ -42,19 +46,13 @@ public class BatchReader<T extends TypeReader> {
   }
 
   /**
-   * Handle an elementary type
-   *
+   * Read the next batch of data from the file.
    * @param batch     the batch to read into
    * @param batchSize the number of rows to read
-   * @throws IOException
+   * @throws IOException errors reading the file
    */
-  public void nextBatch(VectorizedRowBatch batch,
-                        int batchSize) throws IOException {
-    batch.cols[0].reset();
-    batch.cols[0].ensureSize(batchSize, false);
-    rootType.nextVector(batch.cols[0], null, batchSize);
-    resetBatch(batch, batchSize);
-  }
+  public abstract void nextBatch(VectorizedRowBatch batch,
+                                 int batchSize) throws IOException;
 
   protected void resetBatch(VectorizedRowBatch batch, int batchSize) {
     batch.selectedInUse = false;

@@ -49,6 +49,7 @@ import org.apache.orc.OrcProto;
 import org.apache.orc.impl.reader.ReaderEncryption;
 import org.apache.orc.impl.reader.StripePlanner;
 import org.apache.orc.impl.reader.tree.BatchReader;
+import org.apache.orc.impl.reader.tree.PrimitiveBatchReader;
 import org.apache.orc.impl.reader.tree.StructBatchReader;
 import org.apache.orc.impl.reader.tree.TypeReader;
 import org.apache.orc.impl.writer.TimestampTreeWriter;
@@ -2416,13 +2417,13 @@ public class TreeReaderFactory {
     }
   }
 
-  public static BatchReader<? extends TypeReader> createRootReader(TypeDescription readerType, Context context)
+  public static BatchReader createRootReader(TypeDescription readerType, Context context)
           throws IOException {
     TreeReader reader = createTreeReader(readerType, context);
     if (reader instanceof StructTreeReader) {
       return new StructBatchReader((StructTreeReader) reader);
     } else {
-      return new BatchReader<>(reader);
+      return new PrimitiveBatchReader(reader);
     }
   }
 }

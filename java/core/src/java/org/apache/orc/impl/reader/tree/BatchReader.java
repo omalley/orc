@@ -25,7 +25,7 @@ import java.io.IOException;
 
 
 /**
- *
+ * The class that implements reading the file into VectorizedRowBatches.
  */
 public abstract class BatchReader {
   // The row type reader

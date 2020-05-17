@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.orc.RecordReader;
 import org.apache.orc.impl.ReaderImpl;
 import org.apache.orc.util.BloomFilter;
 import org.apache.orc.util.BloomFilterIO;
@@ -94,6 +95,7 @@ public final class FileDump {
     if (cli.hasOption("backup-path")) {
       backupPath = cli.getOptionValue("backup-path");
     }
+    boolean onlyFooter = cli.hasOption('f');
 
     if (cli.hasOption("r")) {
       String val = cli.getOptionValue("r");
@@ -132,7 +134,7 @@ public final class FileDump {
         boolean prettyPrint = cli.hasOption('p');
         JsonFileDump.printJsonMetaData(filesInPath, conf, rowIndexCols, prettyPrint, printTimeZone);
       } else {
-        printMetaData(filesInPath, conf, rowIndexCols, printTimeZone, recover, backupPath);
+        printMetaData(filesInPath, conf, rowIndexCols, printTimeZone, recover, backupPath, onlyFooter);
       }
     }
   }
@@ -267,11 +269,11 @@ public final class FileDump {
 
   private static void printMetaData(List<String> files, Configuration conf,
       List<Integer> rowIndexCols, boolean printTimeZone, final boolean recover,
-      final String backupPath)
+      final String backupPath, boolean onlyFooter)
       throws IOException {
     List<String> corruptFiles = new ArrayList<>();
     for (String filename : files) {
-      printMetaDataImpl(filename, conf, rowIndexCols, printTimeZone, corruptFiles);
+      printMetaDataImpl(filename, conf, rowIndexCols, printTimeZone, corruptFiles, onlyFooter);
       System.out.println(SEPARATOR);
     }
 
@@ -295,7 +297,7 @@ public final class FileDump {
 
   private static void printMetaDataImpl(final String filename,
       final Configuration conf, List<Integer> rowIndexCols, final boolean printTimeZone,
-      final List<String> corruptFiles) throws IOException {
+      final List<String> corruptFiles, boolean onlyFooter) throws IOException {
     Path file = new Path(filename);
     Reader reader = getReader(file, conf, corruptFiles);
     // if we can create reader then footer is not corrupt and file will readable
@@ -306,7 +308,6 @@ public final class FileDump {
     System.out.println("Structure for " + filename);
     System.out.println("File Version: " + reader.getFileVersion().getName() +
         " with " + reader.getWriterVersion());
-    RecordReaderImpl rows = (RecordReaderImpl) reader.rows();
     System.out.println("Rows: " + reader.getNumberOfRows());
     System.out.println("Compression: " + reader.getCompressionKind());
     if (reader.getCompressionKind() != CompressionKind.NONE) {
@@ -339,63 +340,20 @@ public final class FileDump {
       System.out.println("  Column " + i + ": " + stats[i].toString());
     }
     System.out.println("\nStripes:");
-    int stripeIx = -1;
-    for (StripeInformation stripe : reader.getStripes()) {
-      ++stripeIx;
-      long stripeStart = stripe.getOffset();
-      OrcProto.StripeFooter footer = rows.readStripeFooter(stripe);
-      if (printTimeZone) {
-        String tz = footer.getWriterTimezone();
-        if (tz == null || tz.isEmpty()) {
-          tz = UNKNOWN;
-        }
-        System.out.println("  Stripe: " + stripe.toString() + " timezone: " + tz);
-      } else {
-        System.out.println("  Stripe: " + stripe.toString());
+    if (onlyFooter) {
+      int stripeIdx = 0;
+      for(StripeInformation stripe: reader.getStripes()) {
+        System.out.println(String.format("Stripe %d: offset %d, length %d, rows %d",
+            stripeIdx++, stripe.getOffset(), stripe.getLength(), stripe.getNumberOfRows()));
+        System.out.println(String.format("  data: %d, index: %d, footer: %d",
+            stripe.getDataLength(), stripe.getIndexLength(), stripe.getFooterLength()));
       }
-      long sectionStart = stripeStart;
-      for (OrcProto.Stream section : footer.getStreamsList()) {
-        String kind = section.hasKind() ? section.getKind().name() : UNKNOWN;
-        System.out.println("    Stream: column " + section.getColumn() +
-            " section " + kind + " start: " + sectionStart +
-            " length " + section.getLength());
-        sectionStart += section.getLength();
-      }
-      for (int i = 0; i < footer.getColumnsCount(); ++i) {
-        OrcProto.ColumnEncoding encoding = footer.getColumns(i);
-        StringBuilder buf = new StringBuilder();
-        buf.append("    Encoding column ");
-        buf.append(i);
-        buf.append(": ");
-        buf.append(encoding.getKind());
-        if (encoding.getKind() == OrcProto.ColumnEncoding.Kind.DICTIONARY ||
-            encoding.getKind() == OrcProto.ColumnEncoding.Kind.DICTIONARY_V2) {
-          buf.append("[");
-          buf.append(encoding.getDictionarySize());
-          buf.append("]");
-        }
-        System.out.println(buf);
-      }
-      if (rowIndexCols != null && !rowIndexCols.isEmpty()) {
-        // include the columns that are specified, only if the columns are included, bloom filter
-        // will be read
-        boolean[] sargColumns = new boolean[colCount];
-        for (int colIdx : rowIndexCols) {
-          sargColumns[colIdx] = true;
-        }
-        OrcIndex indices = rows
-            .readRowIndex(stripeIx, null, null, null, sargColumns);
-        for (int col : rowIndexCols) {
-          StringBuilder buf = new StringBuilder();
-          String rowIdxString = getFormattedRowIndices(col,
-              indices.getRowGroupIndex(), schema, (ReaderImpl) reader);
-          buf.append(rowIdxString);
-          String bloomFilString = getFormattedBloomFilters(col, indices,
-              reader.getWriterVersion(),
-              reader.getSchema().findSubtype(col).getCategory(),
-              footer.getColumns(col));
-          buf.append(bloomFilString);
-          System.out.println(buf);
+    } else {
+      int stripeIdx = 0;
+      try (RecordReaderImpl rows = (RecordReaderImpl) reader.rows()) {
+        for (StripeInformation stripe : reader.getStripes()) {
+          printDetailStripeInfo(stripeIdx++, stripe, (ReaderImpl) reader,
+              rows, rowIndexCols, printTimeZone);
         }
       }
     }
@@ -419,7 +377,70 @@ public final class FileDump {
       System.out.println("  " + keys.get(i) + "="
         + StandardCharsets.UTF_8.decode(byteBuffer));
     }
-    rows.close();
+  }
+
+  private static void printDetailStripeInfo(int stripeIx,
+                                            StripeInformation stripe,
+                                            ReaderImpl reader,
+                                            RecordReaderImpl rows,
+                                            List<Integer> rowIndexCols,
+                                            boolean printTimeZone) throws IOException {
+    long stripeStart = stripe.getOffset();
+    OrcProto.StripeFooter footer = rows.readStripeFooter(stripe);
+    if (printTimeZone) {
+      String tz = footer.getWriterTimezone();
+      if (tz == null || tz.isEmpty()) {
+        tz = UNKNOWN;
+      }
+      System.out.println("  Stripe: " + stripe.toString() + " timezone: " + tz);
+    } else {
+      System.out.println("  Stripe: " + stripe.toString());
+    }
+    long sectionStart = stripeStart;
+    for (OrcProto.Stream section : footer.getStreamsList()) {
+      String kind = section.hasKind() ? section.getKind().name() : UNKNOWN;
+      System.out.println("    Stream: column " + section.getColumn() +
+          " section " + kind + " start: " + sectionStart +
+          " length " + section.getLength());
+      sectionStart += section.getLength();
+    }
+    for (int i = 0; i < footer.getColumnsCount(); ++i) {
+      OrcProto.ColumnEncoding encoding = footer.getColumns(i);
+      StringBuilder buf = new StringBuilder();
+      buf.append("    Encoding column ");
+      buf.append(i);
+      buf.append(": ");
+      buf.append(encoding.getKind());
+      if (encoding.getKind() == OrcProto.ColumnEncoding.Kind.DICTIONARY ||
+          encoding.getKind() == OrcProto.ColumnEncoding.Kind.DICTIONARY_V2) {
+        buf.append("[");
+        buf.append(encoding.getDictionarySize());
+        buf.append("]");
+      }
+      System.out.println(buf);
+    }
+    if (rowIndexCols != null && !rowIndexCols.isEmpty()) {
+      // include the columns that are specified, only if the columns are included, bloom filter
+      // will be read
+      boolean[] sargColumns = new boolean[reader.getSchema().getMaximumId() + 1];
+      for (int colIdx : rowIndexCols) {
+        sargColumns[colIdx] = true;
+      }
+      OrcIndex indices = rows
+          .readRowIndex(stripeIx, null, null, null, sargColumns);
+      for (int col : rowIndexCols) {
+        StringBuilder buf = new StringBuilder();
+        String rowIdxString = getFormattedRowIndices(col,
+            indices.getRowGroupIndex(), reader.getSchema(), (ReaderImpl) reader);
+        buf.append(rowIdxString);
+        String bloomFilString = getFormattedBloomFilters(col, indices,
+            reader.getWriterVersion(),
+            reader.getSchema().findSubtype(col).getCategory(),
+            footer.getColumns(col));
+        buf.append(bloomFilString);
+        System.out.println(buf);
+      }
+    }
   }
 
   private static void recoverFiles(final List<String> corruptFiles, final Configuration conf,
@@ -732,6 +753,11 @@ public final class FileDump {
         .withLongOpt("timezone")
         .withDescription("Print writer's time zone")
         .create('t'));
+
+     result.addOption(OptionBuilder
+        .withLongOpt("footer")
+        .withDescription("Only look at the file footer")
+        .create('f'));
 
     result.addOption(OptionBuilder
         .withLongOpt("help")

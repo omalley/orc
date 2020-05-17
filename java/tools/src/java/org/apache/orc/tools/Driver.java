@@ -18,12 +18,15 @@
 
 package org.apache.orc.tools;
 
+import java.net.URL;
+import java.net.URLClassLoader;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.orc.tools.convert.ConvertTool;
 import org.apache.orc.tools.json.JsonSchemaFinder;
 
@@ -76,6 +79,18 @@ public class Driver {
     }
   }
 
+  public static Path getHadoopConfDirectory() {
+    String dir = System.getenv("HADOOP_CONF_DIR");
+    if (dir != null) {
+      return new Path("file:///" + dir + "/");
+    }
+    dir = System.getenv("HADOOP_HOME");
+    if (dir != null) {
+      return new Path("file:///" + dir + "/etc/hadoop/");
+    }
+    return null;
+  }
+
   public static void main(String[] args) throws Exception {
     DriverOptions options = new DriverOptions(args);
 
@@ -91,6 +106,7 @@ public class Driver {
       System.err.println("   data - print the data from the ORC file");
       System.err.println("   scan - scan the ORC file");
       System.err.println("   convert - convert CSV and JSON files to ORC");
+      System.err.println("   recover - recover an ORC with missing blocks");
       System.err.println("   json-schema - scan JSON files to determine their schema");
       System.err.println("   key - print information about the keys");
       System.err.println();
@@ -98,6 +114,15 @@ public class Driver {
       System.exit(1);
     }
     Configuration conf = new Configuration();
+    // Add the conf directory to the classpath
+    Path hadoopConfDir = getHadoopConfDirectory();
+    if (hadoopConfDir != null) {
+      ClassLoader classLoaderWithConf = new URLClassLoader(new URL[]{new URL(hadoopConfDir.toString() + "/")},
+          conf.getClassLoader());
+      conf.setClassLoader(classLoaderWithConf);
+      Thread.currentThread().setContextClassLoader(classLoaderWithConf);
+      conf.addDefaultResource("hdfs-site.xml");
+    }
     Properties confSettings = options.genericOptions.getOptionProperties("D");
     for(Map.Entry pair: confSettings.entrySet()) {
       conf.set(pair.getKey().toString(), pair.getValue().toString());
@@ -116,6 +141,8 @@ public class Driver {
       ConvertTool.main(conf, options.commandArgs);
     } else if ("key".equals(options.command)) {
       KeyTool.main(conf, options.commandArgs);
+    } else if ("recover".equals(options.command)) {
+      Recover.main(conf, options.commandArgs);
     } else {
       System.err.println("Unknown subcommand: " + options.command);
       System.exit(1);

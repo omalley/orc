@@ -47,19 +47,4 @@ public interface TimestampColumnStatistics extends ColumnStatistics {
    * @return maximum value in UTC
    */
   Timestamp getMaximumUTC();
-
-  /**
-   * Get the lowest digits of the minimum value for the column.
-   * The minimum value is truncated at ms scale.
-   * @return the 6 lowest digits of minimum value
-   */
-  int getMinimumNanos();
-
-  /**
-   * Get the lowest digits of the maximum value for the column.
-   * The value is the result of: Max TS + 1 (ms) - nanos
-   * @return the 6 lowest digits of maximum value
-   */
-  int getMaximumNanos();
-
 }

@@ -549,8 +549,6 @@ public class TestColumnStatistics {
     TimestampColumnStatistics typed2 = (TimestampColumnStatistics) stats2;
     assertEquals("2000-04-01 03:30:00.0005", typed2.getMinimum().toString());
     assertEquals("2000-04-04 03:30:00.0009", typed2.getMaximum().toString());
-    assertEquals(500_000, typed2.getMinimumNanos());
-    assertEquals(1_000_000 - 900_000, typed2.getMaximumNanos());
     assertEquals(4L, typed2.getNumberOfValues());
     TimeZone.setDefault(original);
   }

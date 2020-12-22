@@ -315,10 +315,10 @@ public class TestRLEv2 {
   }
 
   @Test
-  public void testBaseValueLimit() throws Exception {
+  public void testMaxPatchBaseValue() throws Exception {
     TypeDescription schema = TypeDescription.createInt();
     Writer w = OrcFile.createWriter(testFilePath,
-            OrcFile.writerOptions(conf)
+             OrcFile.writerOptions(conf)
                     .compress(CompressionKind.NONE)
                     .setSchema(schema)
                     .rowIndexStride(0)

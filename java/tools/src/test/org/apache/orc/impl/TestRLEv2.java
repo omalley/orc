@@ -432,4 +432,15 @@ public class TestRLEv2 {
     TestOutputCatcher output = encodeV2(input, false);
     output.compareBytes(0xc2, 0x06, 0x0, 0xa0, 0x9c, 0x01, 0x45, 0x0);
   }
+
+  @Test
+  public void testDirect2Example() throws Exception {
+    long[] input = {Long.MIN_VALUE, -1, -20,
+        -30, -20, -10,
+        -25, -15, -5,
+        -17, -27
+    };
+    TestOutputCatcher output = encodeV2(input, true);
+    output.compareBytes(0xc2, 0x06, 0x0, 0xa0, 0x9c, 0x01, 0x45, 0x0);
+  }
 }

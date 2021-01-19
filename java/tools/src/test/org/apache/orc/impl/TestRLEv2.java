@@ -435,10 +435,11 @@ public class TestRLEv2 {
 
   @Test
   public void testDirect2Example() throws Exception {
-    long[] input = {Long.MIN_VALUE, -1, -20,
-        -30, -20, -10,
-        -25, -15, -5,
-        -17, -27
+    long BASE = -1 << 56;
+    long[] input = {Long.MIN_VALUE, BASE+1, BASE+20, BASE+30, BASE+20,
+        BASE+10, BASE+25, BASE+15, BASE+5, BASE+17,
+        BASE+1, BASE+2, BASE+3, BASE+4, BASE+5,
+        BASE+6, BASE+7, BASE+8, BASE+9, BASE+10
     };
     TestOutputCatcher output = encodeV2(input, true);
     output.compareBytes(0xc2, 0x06, 0x0, 0xa0, 0x9c, 0x01, 0x45, 0x0);

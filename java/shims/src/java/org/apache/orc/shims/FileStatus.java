@@ -16,31 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.orc.impl;
-
-import java.io.OutputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-
-import java.io.IOException;
-import java.util.EnumSet;
+package org.apache.orc.shims;
 
 /**
- * Shims for recent versions of Hadoop
- *
- * Adds support for:
- * <ul>
- *   <li>Variable length HDFS blocks</li>
- * </ul>
+ * The status of a file or directory.
  */
-public class HadoopShimsCurrent extends HadoopShimsPre2_7 {
+public interface FileStatus {
+  /**
+   * How big is the file?
+   * @return the size of the file in bytes
+   */
+  long getLength();
 
-  @Override
-  public boolean endVariableLengthBlock(OutputStream output) throws IOException {
-    if (output instanceof HdfsDataOutputStream) {
-      ((HdfsDataOutputStream) output).hsync(
-          EnumSet.of(HdfsDataOutputStream.SyncFlag.END_BLOCK));
-      return true;
-    }
-    return false;
-  }
+  /**
+   * When was the file last modified?
+   * @return the time as the number of milliseconds since 1 Jan 1970
+   */
+  long getModificationTime();
 }

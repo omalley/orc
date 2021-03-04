@@ -18,29 +18,38 @@
 
 package org.apache.orc.impl;
 
-import java.io.OutputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
+import java.security.Key;
+import java.util.ArrayList;
+import java.util.List;
 
-import java.io.IOException;
-import java.util.EnumSet;
 
 /**
- * Shims for recent versions of Hadoop
- *
- * Adds support for:
- * <ul>
- *   <li>Variable length HDFS blocks</li>
- * </ul>
+ * A trivial key provider that has no keys.
  */
-public class HadoopShimsCurrent extends HadoopShimsPre2_7 {
+class NullKeyProvider implements KeyProvider {
 
-  @Override
-  public boolean endVariableLengthBlock(OutputStream output) throws IOException {
-    if (output instanceof HdfsDataOutputStream) {
-      ((HdfsDataOutputStream) output).hsync(
-          EnumSet.of(HdfsDataOutputStream.SyncFlag.END_BLOCK));
-      return true;
+    @Override
+    public List<String> getKeyNames() {
+      return new ArrayList<>();
     }
-    return false;
+
+    @Override
+    public HadoopShims.KeyMetadata getCurrentKeyVersion(String keyName) {
+      throw new IllegalArgumentException("Unknown key " + keyName);
+    }
+
+    @Override
+    public LocalKey createLocalKey(HadoopShims.KeyMetadata key) {
+      throw new IllegalArgumentException("Unknown key " + key);
+    }
+
+    @Override
+    public Key decryptLocalKey(HadoopShims.KeyMetadata key, byte[] encryptedKey) {
+      return null;
+    }
+
+    @Override
+    public HadoopShims.KeyProviderKind getKind() {
+      return null;
+    }
   }
-}

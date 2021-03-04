@@ -18,30 +18,23 @@
 
 package org.apache.orc.impl;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.util.Properties;
 import java.util.function.Supplier;
-import org.apache.hadoop.fs.FSDataInputStream;
-
-import java.io.IOException;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.orc.shims.Configuration;
 import org.apache.orc.shims.FileIO;
 import org.apache.orc.shims.FileStatus;
 import org.apache.orc.shims.PositionOutputStream;
 import org.apache.orc.shims.SeekableInputStream;
 
-
 /**
- * Shims for versions of Hadoop up to and including 2.2.x
+ * Shims for non-Hadoop deployments
  */
-public class HadoopShimsPre2_3 implements HadoopShims {
-
-  HadoopShimsPre2_3() {
-  }
+public class NonHadoopShims implements HadoopShims {
 
   @Override
   public DirectDecompressor getDirectDecompressor(
@@ -58,93 +51,84 @@ public class HadoopShimsPre2_3 implements HadoopShims {
   }
 
   @Override
-  public boolean endVariableLengthBlock(OutputStream output) throws IOException {
+  public boolean endVariableLengthBlock(OutputStream output) {
     return false;
   }
 
   @Override
   public FileIO createFileIO(Supplier<Object> fs) {
-    return new HadoopFileIO(fs);
+    return new NonHadoopFileIO();
   }
 
   @Override
   public FileIO createFileIO(String path, Configuration conf) throws IOException {
-    Path p = new Path(path);
-    FileSystem fs = p.getFileSystem(((HadoopConfiguration) conf).getHadoopConfig());
-    return new HadoopFileIO(() -> fs);
+    return new NonHadoopFileIO();
   }
 
   @Override
-  public Configuration createConfiguration(Properties tableProperties, Object hadoopConfig) {
-    return new HadoopConfiguration(tableProperties, hadoopConfig);
+  public Configuration createConfiguration(Properties tableProperties, Object config) {
+    return new NonHadoopConfiguration(tableProperties, (Properties) config);
   }
 
-  private static final int HDFS_BUFFER_SIZE = 256 * 1024;
+  static class NonHadoopFileStatus implements FileStatus {
+    private final File status;
 
-  static class HadoopFileStatus implements FileStatus {
-    private final org.apache.hadoop.fs.FileStatus status;
-
-    HadoopFileStatus(org.apache.hadoop.fs.FileStatus status) {
+    NonHadoopFileStatus(File status) {
       this.status = status;
     }
 
     @Override
     public long getLength() {
-      return status.getLen();
+      return status.length();
     }
 
     @Override
     public long getModificationTime() {
-      return status.getModificationTime();
+      return status.lastModified();
     }
   }
 
-  static class HadoopFileIO implements FileIO {
-    private final Supplier<Object> fs;
-
-    HadoopFileIO(Supplier<Object> fs) {
-      this.fs = fs;
-    }
-
-    FileSystem getFileSystem() {
-      return (FileSystem) fs.get();
-    }
+  static class NonHadoopFileIO implements FileIO {
 
     @Override
     public boolean exists(String name) throws IOException {
-      return getFileSystem().exists(new Path(name));
+      return new File(name).exists();
     }
 
     @Override
-    public FileStatus getFileStatus(String name) throws IOException {
-      return new HadoopFileStatus(getFileSystem().getFileStatus(new Path(name)));
+    public FileStatus getFileStatus(String name) {
+      return new NonHadoopFileStatus(new File(name));
     }
 
     @Override
     public SeekableInputStream createInputFile(String name) throws IOException {
-      return new HadoopSeekableInputStream(getFileSystem().open(new Path(name)));
+      return new NonHadoopSeekableInputStream(new RandomAccessFile(name , "r"));
     }
 
     @Override
     public PositionOutputStream createOutputFile(String name,
                                                  boolean overwrite,
                                                  long blockSize) throws IOException {
-      Path path = new Path(name);
-      FileSystem fileSystem = getFileSystem();
-      return new HadoopPositionOutputStream(fileSystem.create(path, overwrite, HDFS_BUFFER_SIZE,
-          fileSystem.getDefaultReplication(path), blockSize));
+      if (overwrite) {
+        new File(name).delete();
+      }
+      return new NonHadoopPositionOutputStream(name, new RandomAccessFile(name, "rw"));
     }
 
     @Override
     public void delete(String name) throws IOException {
-      getFileSystem().delete(new Path(name), false);
+      if (!new File(name).delete()) {
+        throw new IOException("Failed to delete " + name);
+      }
     }
   }
 
-  static class HadoopPositionOutputStream implements PositionOutputStream {
-    private final FSDataOutputStream inner;
+  static class NonHadoopPositionOutputStream implements PositionOutputStream {
+    private final String name;
+    private final RandomAccessFile inner;
 
-    HadoopPositionOutputStream(FSDataOutputStream stream) {
+    NonHadoopPositionOutputStream(String name, RandomAccessFile stream) {
+      this.name = name;
       inner = stream;
     }
 
@@ -160,12 +144,12 @@ public class HadoopShimsPre2_3 implements HadoopShims {
 
     @Override
     public long getPos() throws IOException {
-      return inner.getPos();
+      return inner.getFilePointer();
     }
 
     @Override
     public void flush() throws IOException {
-      inner.hflush();
+      // it doesn't keep a buffer
     }
 
     @Override
@@ -175,25 +159,41 @@ public class HadoopShimsPre2_3 implements HadoopShims {
 
     @Override
     public OutputStream getOutputStream() {
-      return inner;
+      return new OutputStream() {
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+          inner.write(b, off, len);
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+          inner.write(b);
+        }
+
+        @Override
+        public void close() throws IOException {
+          inner.close();
+        }
+      };
     }
 
     @Override
     public String toString() {
-      return inner.toString();
+      return name;
     }
   }
 
-  static class HadoopSeekableInputStream implements SeekableInputStream {
-    private final FSDataInputStream inner;
+  static class NonHadoopSeekableInputStream implements SeekableInputStream {
+    private final RandomAccessFile inner;
 
-    HadoopSeekableInputStream(FSDataInputStream stream) {
+    NonHadoopSeekableInputStream(RandomAccessFile stream) {
       inner = stream;
     }
 
     @Override
     public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
-      inner.readFully(position, buffer, offset, length);
+      inner.seek(position);
+      inner.readFully(buffer, offset, length);
     }
 
     @Override
@@ -203,12 +203,37 @@ public class HadoopShimsPre2_3 implements HadoopShims {
 
     @Override
     public long getPosition() throws IOException {
-      return inner.getPos();
+      return inner.getFilePointer();
     }
 
     @Override
     public InputStream getInputStream() {
-      return inner;
+      return new InputStream() {
+        @Override
+        public int read() throws IOException {
+          return inner.read();
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+          return inner.read(b, off, len);
+        }
+
+        @Override
+        public long skip(long bytes) throws IOException {
+          return inner.skipBytes((int) Math.min(Integer.MAX_VALUE, bytes));
+        }
+
+        @Override
+        public int available() throws IOException {
+          return (int) Math.min(Integer.MAX_VALUE, inner.length() - inner.getFilePointer());
+        }
+
+        @Override
+        public void close() throws IOException {
+          inner.close();
+        }
+      };
     }
 
     @Override
@@ -217,16 +242,13 @@ public class HadoopShimsPre2_3 implements HadoopShims {
     }
   }
 
-  static class HadoopConfiguration implements Configuration {
-    private final org.apache.hadoop.conf.Configuration hadoopConfig;
+  static class NonHadoopConfiguration implements Configuration {
+    private final Properties config;
     private final Properties tableProperties;
 
-    HadoopConfiguration(Properties tableProperties,
-                        Object hadoopConfig) {
-      this.hadoopConfig =
-          hadoopConfig != null && hadoopConfig instanceof org.apache.hadoop.conf.Configuration
-              ? (org.apache.hadoop.conf.Configuration) hadoopConfig
-              : new org.apache.hadoop.conf.Configuration();
+    NonHadoopConfiguration(Properties tableProperties,
+                           Properties config) {
+      this.config = config != null ? config : new Properties();
       this.tableProperties = tableProperties;
     }
 
@@ -237,22 +259,14 @@ public class HadoopShimsPre2_3 implements HadoopShims {
         result = tableProperties.getProperty(key);
       }
       if (result == null) {
-        result = hadoopConfig.get(key);
+        result = config.getProperty(key);
       }
       return result;
     }
 
     @Override
     public void set(String key, String value) {
-      hadoopConfig.set(key, value);
-    }
-
-    /**
-     * Should only be called when we are using Hadoop.
-     * @return the Hadoop configuration
-     */
-    org.apache.hadoop.conf.Configuration getHadoopConfig() {
-      return hadoopConfig;
+      config.put(key, value);
     }
   }
 }

@@ -16,31 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.orc.impl;
-
-import java.io.OutputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-
-import java.io.IOException;
-import java.util.EnumSet;
+package org.apache.orc.shims;
 
 /**
- * Shims for recent versions of Hadoop
- *
- * Adds support for:
- * <ul>
- *   <li>Variable length HDFS blocks</li>
- * </ul>
+ * A shim for a configuration object.
  */
-public class HadoopShimsCurrent extends HadoopShimsPre2_7 {
+public interface Configuration {
+  /**
+   * Get the value of a given key
+   * @param key the key to look up
+   * @return the value of the given key or null if that key isn't set
+   */
+  String get(String key);
 
-  @Override
-  public boolean endVariableLengthBlock(OutputStream output) throws IOException {
-    if (output instanceof HdfsDataOutputStream) {
-      ((HdfsDataOutputStream) output).hsync(
-          EnumSet.of(HdfsDataOutputStream.SyncFlag.END_BLOCK));
-      return true;
-    }
-    return false;
-  }
+  /**
+   * Set the value for a given key
+   * @param key the key to set
+   * @param value the new value to set
+   */
+  void set(String key, String value);
 }

@@ -54,6 +54,7 @@
   </mailingLists>
 
   <modules>
+    <module>nodoop</module>
     <module>shims</module>
     <module>core</module>
     <module>mapreduce</module>

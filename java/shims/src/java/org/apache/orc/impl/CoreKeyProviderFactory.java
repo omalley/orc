@@ -18,29 +18,23 @@
 
 package org.apache.orc.impl;
 
-import java.io.OutputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-
 import java.io.IOException;
-import java.util.EnumSet;
+import java.util.Random;
+import org.apache.orc.InMemoryKeystore;
+import org.apache.orc.shims.Configuration;
 
 /**
- * Shims for recent versions of Hadoop
- *
- * Adds support for:
- * <ul>
- *   <li>Variable length HDFS blocks</li>
- * </ul>
+ * This class provides the core key providers.
  */
-public class HadoopShimsCurrent extends HadoopShimsPre2_7 {
+public class CoreKeyProviderFactory implements KeyProvider.FactoryCore {
 
   @Override
-  public boolean endVariableLengthBlock(OutputStream output) throws IOException {
-    if (output instanceof HdfsDataOutputStream) {
-      ((HdfsDataOutputStream) output).hsync(
-          EnumSet.of(HdfsDataOutputStream.SyncFlag.END_BLOCK));
-      return true;
+  public KeyProvider create(String kind,
+                            Configuration conf,
+                            Random random) throws IOException {
+    if ("memory".equals(kind)) {
+      return new InMemoryKeystore(random);
     }
-    return false;
+    return null;
   }
 }

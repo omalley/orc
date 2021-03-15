@@ -147,19 +147,4 @@ public class CryptoUtils {
     }
     return result;
   }
-
-  public static class HadoopKeyProviderFactory implements KeyProvider.Factory {
-
-    @Override
-    public KeyProvider create(String kind,
-                              Configuration conf,
-                              Random random) throws IOException {
-      if ("hadoop".equals(kind)) {
-        return HadoopShimsFactory.get().getHadoopKeyProvider(conf, random);
-      } else if ("memory".equals(kind)) {
-        return new InMemoryKeystore(random);
-      }
-      return null;
-    }
-  }
 }

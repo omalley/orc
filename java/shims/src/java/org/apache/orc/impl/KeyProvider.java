@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.security.Key;
 import java.util.List;
 import java.util.Random;
-import org.apache.orc.shims.Configuration;
+import org.apache.orc.shims.OrcConfiguration;
 
 
 /**
@@ -86,7 +86,7 @@ public interface KeyProvider {
      * @return a new KeyProvider or null if the kind isn't known
      */
     KeyProvider create(String kind,
-                       Configuration conf,
+                       OrcConfiguration conf,
                        Random random) throws IOException;
   }
 

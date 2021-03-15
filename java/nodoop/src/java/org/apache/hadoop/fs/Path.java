@@ -16,25 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.orc.impl;
+package org.apache.hadoop.fs;
 
-import java.io.IOException;
-import java.util.Random;
-import org.apache.orc.InMemoryKeystore;
-import org.apache.orc.shims.OrcConfiguration;
-
-/**
- * This class provides the core key providers.
- */
-public class CoreKeyProviderFactory implements KeyProvider.FactoryCore {
-
-  @Override
-  public KeyProvider create(String kind,
-                            OrcConfiguration conf,
-                            Random random) throws IOException {
-    if ("memory".equals(kind)) {
-      return new InMemoryKeystore(random);
-    }
-    return null;
-  }
+public class Path {
 }

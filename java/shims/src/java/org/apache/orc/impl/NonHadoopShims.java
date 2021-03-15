@@ -24,8 +24,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Properties;
-import java.util.function.Supplier;
-import org.apache.orc.shims.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.orc.shims.OrcConfiguration;
 import org.apache.orc.shims.FileIO;
 import org.apache.orc.shims.FileStatus;
 import org.apache.orc.shims.PositionOutputStream;
@@ -56,17 +56,17 @@ public class NonHadoopShims implements HadoopShims {
   }
 
   @Override
-  public FileIO createFileIO(Supplier<Object> fs) {
+  public FileIO createFileIO(FileSystem fs) {
     return new NonHadoopFileIO();
   }
 
   @Override
-  public FileIO createFileIO(String path, Configuration conf) throws IOException {
+  public FileIO createFileIO(String path, OrcConfiguration conf) throws IOException {
     return new NonHadoopFileIO();
   }
 
   @Override
-  public Configuration createConfiguration(Properties tableProperties, Object config) {
+  public OrcConfiguration createConfiguration(Properties tableProperties, Object config) {
     return new NonHadoopConfiguration(tableProperties, (Properties) config);
   }
 
@@ -242,7 +242,7 @@ public class NonHadoopShims implements HadoopShims {
     }
   }
 
-  static class NonHadoopConfiguration implements Configuration {
+  static class NonHadoopConfiguration implements OrcConfiguration {
     private final Properties config;
     private final Properties tableProperties;
 

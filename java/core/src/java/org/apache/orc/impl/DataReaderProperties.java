@@ -23,12 +23,15 @@ import org.apache.hadoop.fs.Path;
 import org.apache.orc.OrcConf;
 
 import java.util.function.Supplier;
+import org.apache.orc.shims.FileIO;
+import org.apache.orc.shims.SeekableInputStream;
+
 
 public final class DataReaderProperties {
 
-  private final Supplier<FileSystem> fileSystemSupplier;
-  private final Path path;
-  private final FSDataInputStream file;
+  private final Supplier<FileIO> fileSystemSupplier;
+  private final String path;
+  private final SeekableInputStream file;
   private final InStream.StreamOptions compression;
   private final boolean zeroCopy;
   private final int maxDiskRangeChunkLimit;
@@ -46,11 +49,11 @@ public final class DataReaderProperties {
     return fileSystemSupplier;
   }
 
-  public Path getPath() {
+  public String getPath() {
     return path;
   }
 
-  public FSDataInputStream getFile() {
+  public SeekableInputStream getFile() {
     return file;
   }
 
@@ -71,10 +74,10 @@ public final class DataReaderProperties {
   }
 
   public static class Builder {
-
-    private Supplier<FileSystem> fileSystemSupplier;
-    private Path path;
-    private FSDataInputStream file;
+    private static final HadoopShims SHIMS = HadoopShimsFactory.get();
+    private Supplier<FileIO> fileSystemSupplier;
+    private String path;
+    private SeekableInputStream file;
     private InStream.StreamOptions compression;
     private boolean zeroCopy;
     private int maxDiskRangeChunkLimit = (int) OrcConf.ORC_MAX_DISK_RANGE_CHUNK_LIMIT.getDefaultValue();;
@@ -84,21 +87,21 @@ public final class DataReaderProperties {
     }
 
     public Builder withFileSystemSupplier(Supplier<FileSystem> supplier) {
-      this.fileSystemSupplier = supplier;
+      this.fileSystemSupplier = () -> SHIMS.createFileIO(supplier.get());
       return this;
     }
 
     public Builder withFileSystem(FileSystem filesystem) {
-      this.fileSystemSupplier = () -> filesystem;
+      this.fileSystemSupplier = () -> SHIMS.createFileIO(filesystem);
       return this;
     }
 
     public Builder withPath(Path path) {
-      this.path = path;
+      this.path = path.toString();
       return this;
     }
 
-    public Builder withFile(FSDataInputStream file) {
+    public Builder withFile(SeekableInputStream file) {
       this.file = file;
       return this;
     }

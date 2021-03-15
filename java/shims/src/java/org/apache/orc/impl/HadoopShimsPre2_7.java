@@ -19,11 +19,11 @@
 package org.apache.orc.impl;
 
 import java.util.ServiceLoader;
-import java.util.function.Supplier;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.orc.EncryptionAlgorithm;
-import org.apache.orc.shims.Configuration;
+import org.apache.orc.shims.OrcConfiguration;
 import org.apache.orc.shims.FileIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -243,7 +243,7 @@ public class HadoopShimsPre2_7 extends HadoopShimsPre2_6 {
 
   @Override
   public KeyProvider getKeyProvider(String kind,
-                                    Configuration conf,
+                                    OrcConfiguration conf,
                                     Random random) throws IOException {
     KeyProvider result = lookupHadoopKeyProvider(kind,
         ((HadoopConfiguration) conf).getHadoopConfig(), random);
@@ -251,7 +251,7 @@ public class HadoopShimsPre2_7 extends HadoopShimsPre2_6 {
   }
 
   @Override
-  public FileIO createFileIO(Supplier<Object> fs) {
+  public FileIO createFileIO(FileSystem fs) {
     return new HadoopShimsPre2_3.HadoopFileIO(fs);
   }
 }

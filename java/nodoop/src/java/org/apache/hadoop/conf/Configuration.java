@@ -16,23 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.orc.shims;
+package org.apache.hadoop.conf;
 
-/**
- * A shim for a configuration object.
- */
-public interface Configuration {
-  /**
-   * Get the value of a given key
-   * @param key the key to look up
-   * @return the value of the given key or null if that key isn't set
-   */
-  String get(String key);
-
-  /**
-   * Set the value for a given key
-   * @param key the key to set
-   * @param value the new value to set
-   */
-  void set(String key, String value);
+public class Configuration {
 }

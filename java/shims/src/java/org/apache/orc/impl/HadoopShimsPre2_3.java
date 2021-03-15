@@ -21,14 +21,14 @@ package org.apache.orc.impl;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Properties;
-import java.util.function.Supplier;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 
 import java.io.IOException;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.orc.shims.Configuration;
+import org.apache.orc.shims.OrcConfiguration;
 import org.apache.orc.shims.FileIO;
 import org.apache.orc.shims.FileStatus;
 import org.apache.orc.shims.PositionOutputStream;
@@ -63,20 +63,21 @@ public class HadoopShimsPre2_3 implements HadoopShims {
   }
 
   @Override
-  public FileIO createFileIO(Supplier<Object> fs) {
+  public FileIO createFileIO(FileSystem fs) {
     return new HadoopFileIO(fs);
   }
 
   @Override
-  public FileIO createFileIO(String path, Configuration conf) throws IOException {
+  public FileIO createFileIO(String path, OrcConfiguration conf) throws IOException {
     Path p = new Path(path);
     FileSystem fs = p.getFileSystem(((HadoopConfiguration) conf).getHadoopConfig());
-    return new HadoopFileIO(() -> fs);
+    return new HadoopFileIO(fs);
   }
 
   @Override
-  public Configuration createConfiguration(Properties tableProperties, Object hadoopConfig) {
-    return new HadoopConfiguration(tableProperties, hadoopConfig);
+  public OrcConfiguration createConfiguration(Properties tableProperties, Object hadoopConfig) {
+    return new HadoopConfiguration(tableProperties,
+        (org.apache.hadoop.conf.Configuration) hadoopConfig);
   }
 
   private static final int HDFS_BUFFER_SIZE = 256 * 1024;
@@ -100,14 +101,14 @@ public class HadoopShimsPre2_3 implements HadoopShims {
   }
 
   static class HadoopFileIO implements FileIO {
-    private final Supplier<Object> fs;
+    private final FileSystem fs;
 
-    HadoopFileIO(Supplier<Object> fs) {
+    HadoopFileIO(FileSystem fs) {
       this.fs = fs;
     }
 
     FileSystem getFileSystem() {
-      return (FileSystem) fs.get();
+      return fs;
     }
 
     @Override
@@ -217,16 +218,14 @@ public class HadoopShimsPre2_3 implements HadoopShims {
     }
   }
 
-  static class HadoopConfiguration implements Configuration {
-    private final org.apache.hadoop.conf.Configuration hadoopConfig;
+  static class HadoopConfiguration implements OrcConfiguration {
+    private final Configuration hadoopConfig;
     private final Properties tableProperties;
 
     HadoopConfiguration(Properties tableProperties,
-                        Object hadoopConfig) {
-      this.hadoopConfig =
-          hadoopConfig != null && hadoopConfig instanceof org.apache.hadoop.conf.Configuration
-              ? (org.apache.hadoop.conf.Configuration) hadoopConfig
-              : new org.apache.hadoop.conf.Configuration();
+                        org.apache.hadoop.conf.Configuration hadoopConfig) {
+      this.hadoopConfig = hadoopConfig != null
+          ? hadoopConfig : new Configuration();
       this.tableProperties = tableProperties;
     }
 

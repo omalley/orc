@@ -21,14 +21,14 @@ package org.apache.orc.impl;
 import java.io.OutputStream;
 import java.util.Properties;
 import java.util.ServiceLoader;
-import java.util.function.Supplier;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.orc.EncryptionAlgorithm;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
-import org.apache.orc.shims.Configuration;
+import org.apache.orc.shims.OrcConfiguration;
 import org.apache.orc.shims.FileIO;
 import org.apache.orc.shims.SeekableInputStream;
 
@@ -206,7 +206,7 @@ public interface HadoopShims {
    * @return a key provider
    */
   default KeyProvider getKeyProvider(String kind,
-                                     Configuration conf,
+                                     OrcConfiguration conf,
                                      Random random) throws IOException {
     ServiceLoader<KeyProvider.FactoryCore> loader =
         ServiceLoader.load(KeyProvider.FactoryCore.class);
@@ -224,7 +224,7 @@ public interface HadoopShims {
    * @param fileSystem The supplier for the file system or null for the default
    * @return a FileIO object for a given file system
    */
-  FileIO createFileIO(Supplier<Object> fileSystem);
+  FileIO createFileIO(FileSystem fileSystem);
 
   /**
    * Create a FileIO object to read or write files at a given path.
@@ -232,7 +232,7 @@ public interface HadoopShims {
    * @param conf The configuration for the FileIO
    * @return a FileIO object
    */
-  FileIO createFileIO(String path, Configuration conf) throws IOException;
+  FileIO createFileIO(String path, OrcConfiguration conf) throws IOException;
 
   /**
    * Create a configuration object.
@@ -240,5 +240,5 @@ public interface HadoopShims {
    * @param hadoopConfig a Hadoop Configuration or null if one is not available
    * @return the shim configuration object
    */
-  Configuration createConfiguration(Properties tableProperties, Object hadoopConfig);
+  OrcConfiguration createConfiguration(Properties tableProperties, Object hadoopConfig);
 }

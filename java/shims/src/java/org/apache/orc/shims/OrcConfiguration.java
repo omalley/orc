@@ -16,25 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.orc.impl;
-
-import java.io.IOException;
-import java.util.Random;
-import org.apache.orc.InMemoryKeystore;
-import org.apache.orc.shims.OrcConfiguration;
+package org.apache.orc.shims;
 
 /**
- * This class provides the core key providers.
+ * A shim for a configuration object.
  */
-public class CoreKeyProviderFactory implements KeyProvider.FactoryCore {
+public interface OrcConfiguration {
+  /**
+   * Get the value of a given key
+   * @param key the key to look up
+   * @return the value of the given key or null if that key isn't set
+   */
+  String get(String key);
 
-  @Override
-  public KeyProvider create(String kind,
-                            OrcConfiguration conf,
-                            Random random) throws IOException {
-    if ("memory".equals(kind)) {
-      return new InMemoryKeystore(random);
-    }
-    return null;
-  }
+  /**
+   * Set the value for a given key
+   * @param key the key to set
+   * @param value the new value to set
+   */
+  void set(String key, String value);
 }

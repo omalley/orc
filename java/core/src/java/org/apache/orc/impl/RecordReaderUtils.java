@@ -17,6 +17,7 @@
  */
 package org.apache.orc.impl;
 
+import org.apache.orc.shims.SeekableInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,7 @@ public class RecordReaderUtils {
   private static final Logger LOG = LoggerFactory.getLogger(RecordReaderUtils.class);
 
   private static class DefaultDataReader implements DataReader {
-    private FSDataInputStream file;
+    private SeekableInputStream file;
     private ByteBufferAllocatorPool pool;
     private HadoopShims.ZeroCopyReaderShim zcr = null;
     private final Supplier<FileSystem> fileSystemSupplier;
@@ -488,7 +489,7 @@ public class RecordReaderUtils {
     }
   }
 
-  static HadoopShims.ZeroCopyReaderShim createZeroCopyShim(FSDataInputStream file,
+  static HadoopShims.ZeroCopyReaderShim createZeroCopyShim(SeekableInputStream file,
       CompressionCodec codec, ByteBufferAllocatorPool pool) throws IOException {
     if ((codec == null || ((codec instanceof DirectDecompressionCodec)
             && ((DirectDecompressionCodec) codec).isAvailable()))) {
